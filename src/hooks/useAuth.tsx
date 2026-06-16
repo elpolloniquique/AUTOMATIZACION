@@ -43,14 +43,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function fetchProfile(userId: string) {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    if (error) {
+      console.warn('[auth] Perfil no encontrado:', error.message);
+    }
     setProfile(data as Profile | null);
     setLoading(false);
   }
 
   async function signIn(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
     if (error) throw error;
+    if (data.user) {
+      setUser(data.user);
+      setSession(data.session);
+      await fetchProfile(data.user.id);
+    }
   }
 
   async function signOut() {

@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 const loginSchema = z.object({
   email: z.string().email('Correo inválido'),
@@ -16,23 +17,49 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 
+function translateAuthError(message: string): string {
+  const map: Record<string, string> = {
+    'Invalid login credentials': 'Correo o contraseña incorrectos',
+    'Email not confirmed': 'Confirma tu correo en Supabase (Authentication → Users)',
+    'User not found': 'Usuario no encontrado',
+  };
+  return map[message] || message;
+}
+
 export default function LoginPage() {
-  const { signIn, resetPassword } = useAuth();
+  const { signIn, resetPassword, user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [error, setError] = useState('');
   const [resetSent, setResetSent] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const { register, handleSubmit, formState: { errors }, getValues } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: 'tutacanehuillca@gmail.com',
+    },
   });
 
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, authLoading, navigate]);
+
   async function onSubmit(data: LoginForm) {
+    if (!isSupabaseConfigured) {
+      setError('Supabase no configurado. Revisa VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en .env y reinicia npm run dev');
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
-      await signIn(data.email, data.password);
+      await signIn(data.email.trim(), data.password);
+      navigate('/', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
+      const msg = err instanceof Error ? err.message : 'Error al iniciar sesión';
+      setError(translateAuthError(msg));
     } finally {
       setLoading(false);
     }
@@ -59,6 +86,9 @@ export default function LoginPage() {
           <div className="w-16 h-16 rounded-full bg-pollon-red text-white flex items-center justify-center text-2xl font-bold mx-auto mb-4">EP</div>
           <CardTitle>El Pollón Social Automation</CardTitle>
           <p className="text-sm text-gray-500">Inicia sesión en tu panel</p>
+          {!isSupabaseConfigured && (
+            <p className="text-xs text-red-600 mt-2">⚠️ Supabase no detectado. Reinicia el servidor tras editar .env</p>
+          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
