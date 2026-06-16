@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { isSupabaseConfigured } from '@/lib/supabase';
+import { isSupabaseConfigured, getSupabaseStatus } from '@/lib/supabase';
 
 const loginSchema = z.object({
   email: z.string().email('Correo inválido'),
@@ -39,6 +39,8 @@ export default function LoginPage() {
       email: 'tutacanehuillca@gmail.com',
     },
   });
+
+  const supabaseStatus = getSupabaseStatus();
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -86,8 +88,13 @@ export default function LoginPage() {
           <div className="w-16 h-16 rounded-full bg-pollon-red text-white flex items-center justify-center text-2xl font-bold mx-auto mb-4">EP</div>
           <CardTitle>El Pollón Social Automation</CardTitle>
           <p className="text-sm text-gray-500">Inicia sesión en tu panel</p>
+          <p className={`text-xs mt-2 ${supabaseStatus.ok ? 'text-green-600' : 'text-red-600'}`}>
+            {supabaseStatus.ok ? '✓' : '✗'} {supabaseStatus.hint}
+          </p>
           {!isSupabaseConfigured && (
-            <p className="text-xs text-red-600 mt-2">⚠️ Supabase no detectado. Reinicia el servidor tras editar .env</p>
+            <p className="text-xs text-red-600 mt-1">
+              En Vercel: Settings → Environment Variables → agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY → Redeploy
+            </p>
           )}
         </CardHeader>
         <CardContent>
