@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { width: 1080px; height: 1080px; font-family: 'Segoe UI', Arial, sans-serif; }
+  .card {
+    width: 1080px; height: 1080px;
+    background: #1a1a1a;
+    display: flex; flex-direction: column;
+  }
+  .hero { flex: 1; background: linear-gradient(to bottom, transparent 60%, #1a1a1a), url('{{productImageUrl}}') center/cover; min-height: 600px; position: relative; }
+  .star { position: absolute; top: 40px; left: 40px; background: #f5a623; color: #1a1a1a; font-size: 28px; font-weight: 900; padding: 15px 30px; border-radius: 10px; }
+  .info { padding: 40px 50px; }
+  .title { color: #fff; font-size: 64px; font-weight: 900; line-height: 1.1; }
+  .price { color: {{brandColor}}; font-size: 72px; font-weight: 900; margin: 15px 0; }
+  .desc { color: #aaa; font-size: 28px; }
+  .bottom { display: flex; justify-content: space-between; align-items: center; padding: 30px 50px; background: {{brandColor}}; }
+  .cta { color: #fff; font-size: 32px; font-weight: 800; }
+  .branch { color: rgba(255,255,255,0.9); font-size: 24px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="hero">
+    <div class="star">⭐ PRODUCTO DESTACADO</div>
+  </div>
+  <div class="info">
+    <h1 class="title">{{offerTitle}}</h1>
+    <div class="price">{{price}}</div>
+    <p class="desc">El mejor pollo a la brasa de la región</p>
+  </div>
+  <div class="bottom">
+    <div>
+      <div class="cta">{{cta}}</div>
+      <div class="branch">{{branchName}}</div>
+    </div>
+    <img src="{{logoUrl}}" alt="Logo" style="width:80px;height:80px;border-radius:50%;background:#fff;padding:8px;" onerror="this.style.display='none'">
+  </div>
+</div>
+</body>
+</html>

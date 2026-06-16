@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { width: 1080px; height: 1080px; font-family: 'Segoe UI', Arial, sans-serif; }
+  .card {
+    width: 1080px; height: 1080px;
+    background: repeating-linear-gradient(45deg, {{brandColor}}, {{brandColor}} 20px, #a00000 20px, #a00000 40px);
+    display: flex; align-items: center; justify-content: center; padding: 30px;
+  }
+  .inner {
+    width: 100%; height: 100%;
+    background: #1a1a1a; border-radius: 30px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border: 8px solid #f5a623; padding: 50px; text-align: center;
+  }
+  .weekend { color: #f5a623; font-size: 48px; font-weight: 900; letter-spacing: 8px; text-transform: uppercase; margin-bottom: 20px; }
+  .title { color: #fff; font-size: 68px; font-weight: 900; line-height: 1.1; }
+  .price { color: #fff; background: {{brandColor}}; font-size: 80px; font-weight: 900; padding: 20px 60px; border-radius: 20px; margin: 30px 0; display: inline-block; }
+  .emoji-row { font-size: 60px; margin: 20px 0; }
+  .cta { background: #f5a623; color: #1a1a1a; font-size: 36px; font-weight: 900; padding: 25px 60px; border-radius: 60px; margin-top: 20px; }
+  .branch { color: #888; font-size: 26px; margin-top: 25px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="inner">
+    <div class="weekend">🎉 Fin de Semana</div>
+    <h1 class="title">{{offerTitle}}</h1>
+    <div class="emoji-row">🍗 🔥 🍟</div>
+    <div class="price">{{price}}</div>
+    <div class="cta">{{cta}}</div>
+    <p class="branch">📍 {{branchName}} — El Pollón</p>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,1068 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Pollería El Pollón - Iquique - Delivery rápido y seguro</title>
+
+  <!-- Favicon -->
+  <link rel="icon" href="img/logo.png" type="image/png">
+  <link rel="apple-touch-icon" href="img/logo.png">
+  <link rel="shortcut icon" href="img/logo.png">
+
+  <!-- SEO / Open Graph -->
+  <meta name="description" content="Pollo a la brasa, comida peruana, combos familiares y atención de calidad en Iquique.">
+  <meta property="og:title" content="Pollería El Pollón - Iquique - DELIVERY">
+  <meta property="og:description" content="Delicioso pollo a la brasa en Iquique — ¡haz tu pedido online!">
+  <meta property="og:image" content="https://tuservidoom/portada.jpg">
+  <meta property="og:url" content="https://elpolloniquique.github.io/el-pollon-iquique/">
+  <meta property="og:type" content="website">
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Estilos personalizados -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-white">
+
+  <!-- Header -->
+  <header  class="text-white py-3 px-0 sm:px-4 sticky top-0 z-50 shadow-lg"
+          style="background:linear-gradient(135deg,#b40000 0%,#c50000 100%);">
+    <div class="max-w-7xl 2xl:max-w-[1900px] mx-auto px-2 lg:px-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <!-- LOGO -->
+          <div class="logo">
+            <img src="img/logo pollon.png" alt="Logo Pollería"
+                 onerror="this.src=''; this.alt='Logo no disponible'; this.style.display='none';">
+          </div>
+          <div class="hidden md:block">
+            <h1 class="text-2xl font-bold">Pollería El Pollón</h1>
+            <p class="text-sm opacity-90">📍 Iquique</p>
+          </div>
+       </div>
+          
+                 <!-- NUEVO: selector de tipo de pedido -->
+ <div class="mt-2 md:mt-0">
+  <p class="text-center text-[11px] sm:text-sm font-semibold mb-1 opacity-90">
+    ¿Cómo desea hacer su pedido?
+  </p>
+
+  <!-- Menú tipo "El Fogón" (solo diseño, mantiene IDs y funciones) -->
+  <nav class="flex items-center justify-center gap-4 sm:gap-6 whitespace-nowrap">
+    <button id="btn-delivery"
+      class="pedido-link">
+      DELIVERY
+    </button>
+
+    <button id="btn-reservas"
+      class="pedido-link">
+      RESERVAS
+    </button>
+
+    <button id="btn-retiros"
+      class="pedido-link">
+      RETIROS
+    </button>
+  </nav>
+ </div>
+ <!-- ✅ NUEVO: Menú hamburguesa SOLO PC/TABLET -->
+ <!-- <button id="menu-open-desktop"
+        class="hidden md:flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg hover:bg-white/10 transition">
+  <span class="text-[10px] uppercase tracking-widest opacity-90">Menú</span>
+  <span class="text-2xl leading-none">☰</span>
+ </button> -->
+
+         
+    
+
+
+        <div class="hidden lg:flex items-center gap-4">
+
+          <div class="menu-dd-wrap hidden md:block relative">
+            <button id="menu-dd-btn" type="button" class="menu-dd-btn" aria-expanded="false">
+               <span class="menu-dd-top">MENÚ</span>
+               <span class="menu-dd-bottom">☰ <span class="menu-dd-caret">▾</span></span>
+            </button>
+
+           <div id="menu-dd-panel" class="menu-dd-panel hidden" role="menu">
+              <button class="menu-dd-item" data-category="ofertas-familiares" type="button">👨‍👩‍👧‍👦 Ofertas Familiares</button>
+              <button class="menu-dd-item" data-category="ofertas-dos" type="button">👫 Ofertas para Dos</button>
+              <button class="menu-dd-item" data-category="ofertas-personales" type="button">🧑 Ofertas Personales</button>
+              <button class="menu-dd-item" data-category="platos-extras" type="button">🍽️ Platos Extras</button>
+              <button class="menu-dd-item" data-category="agregados" type="button">➕ Agregados</button>
+              <button class="menu-dd-item" data-category="bebidas" type="button">🥤 Bebidas</button>
+              <button class="menu-dd-item" data-category="descartables" type="button">🍴 Descartables</button>
+           </div>
+         </div>
+
+
+          <div class="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-lg">
+            <span>📞</span>
+            <div>
+              <p class="text-xs opacity-75">Llámanos</p>
+              <p class="font-bold text-sm">+56 9 8692 5310</p>
+            </div>
+          </div>
+          <button id="view-cart-desktop"
+                  class="bg-yellow-400 text-red-900 px-6 py-3 rounded-lg font-bold hover:bg-yellow-300 transition flex items-center gap-2">
+            <span>🛒</span><span>Ver Mi Pedido</span>
+            <span id="cart-badge-desktop"
+                  class="bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">0</span>
+          </button>
+        </div>
+
+        <!-- Botón menú móvil -->
+        <!-- ✅ MENÚ DROPDOWN (SOLO CELULAR) -->
+<div class="menu-dd-wrap md:hidden relative">
+  <button id="menu-dd-btn-mobile" type="button" class="menu-dd-btn" aria-expanded="false">
+    <span class="menu-dd-top">MENÚ</span>
+    <span class="menu-dd-bottom">☰ <span class="menu-dd-caret">▾</span></span>
+  </button>
+
+  <div id="menu-dd-panel-mobile" class="menu-dd-panel hidden" role="menu">
+
+    <!-- ✅ Ver Mi Pedido (primero) -->
+    <button id="menu-dd-cart-mobile" type="button" class="menu-dd-cart">
+      <span class="menu-dd-cart-left">🛒 <span>Ver Mi Pedido</span></span>
+      <span id="menu-dd-cart-badge" class="menu-dd-cart-badge">0</span>
+    </button>
+
+    <div class="menu-dd-divider"></div>
+
+    <!-- ✅ Categorías -->
+    <button class="menu-dd-item" data-category="ofertas-familiares" type="button">👨‍👩‍👧‍👦 Ofertas Familiares</button>
+    <button class="menu-dd-item" data-category="ofertas-dos" type="button">👫 Ofertas para Dos</button>
+    <button class="menu-dd-item" data-category="ofertas-personales" type="button">🧑 Ofertas Personales</button>
+    <button class="menu-dd-item" data-category="platos-extras" type="button">🍽️ Platos Extras</button>
+    <button class="menu-dd-item" data-category="agregados" type="button">➕ Agregados</button>
+    <button class="menu-dd-item" data-category="bebidas" type="button">🥤 Bebidas</button>
+    <button class="menu-dd-item" data-category="descartables" type="button">🍴 Descartables</button>
+  </div>
+</div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- Sidebar -->
+  <div id="sidebar-menu"
+       class="fixed top-0 left-0 h-full w-80 bg-white shadow-2xl transform -translate-x-full transition-transform duration-300 z-[60] overflow-y-auto">
+    <div class="p-6">
+      <div class="flex justify-between items-center mb-6 pb-4 border-b-2 border-red-600">
+        <h2 class="text-2xl font-bold text-red-800">📋 Menú</h2>
+        <button id="close-sidebar" class="text-gray-500 hover:text-red-600 transition">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <button id="view-cart-mobile"
+              class="w-full bg-yellow-400 text-red-900 px-6 py-4 rounded-lg font-bold hover:bg-yellow-300 transition mb-6 flex items-center justify-between">
+        <span class="flex items-center gap-2">
+          <span class="text-2xl">🛒</span><span>Ver Mi Pedido</span>
+        </span>
+        <span id="cart-badge-mobile"
+              class="bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">0</span>
+      </button>
+
+      <div class="space-y-3">
+        <h3 class="text-lg font-bold text-gray-700 mb-3">🍽️ Categorías</h3>
+        <button class="sidebar-category w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center gap-3 border-2 border-transparent hover:border-red-600"
+                data-category="ofertas-familiares">👨‍👩‍👧‍👦 Ofertas Familiares</button>
+        <button class="sidebar-category w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center gap-3 border-2 border-transparent hover:border-red-600"
+                data-category="ofertas-dos">👫 Ofertas para Dos</button>
+        <button class="sidebar-category w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center gap-3 border-2 border-transparent hover:border-red-600"
+                data-category="ofertas-personales">🧑 Ofertas Personales</button>
+        <button class="sidebar-category w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center gap-3 border-2 border-transparent hover:border-red-600"
+                data-category="platos-extras">🍽️ Platos Extras</button>
+        <button class="sidebar-category w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center gap-3 border-2 border-transparent hover:border-red-600"
+                data-category="agregados">➕ Agregados</button>
+        <button class="sidebar-category w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center gap-3 border-2 border-transparent hover:border-red-600"
+                data-category="bebidas">🥤 Bebidas</button>
+
+        <button class="sidebar-category w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center gap-3 border-2 border-transparent hover:border-red-600"
+                data-category="descartables">🍴 Descartables</button>
+
+                
+      </div>
+
+      <div class="mt-8 pt-6 border-t-2 border-gray-200 text-sm text-gray-600 space-y-2">
+        <p class="flex items-center gap-2"><span>📱</span><span>+56 9 8692 5310</span></p>
+        <p class="flex items-center gap-2"><span>📍</span><span>Calle Vivar 1086, Iquique</span></p>
+        <p class="flex items-center gap-2"><span>🕐</span><span>Lun-Dom: 11:30 - 23:00</span></p>
+      </div>
+    </div>
+  </div>
+  <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-[55] hidden"></div>
+
+  <!-- Banner / Carrusel -->
+  <section class="py-0 px-0">
+    <div class="relative overflow-hidden hero-banner">
+
+      <div id="carousel-container" class="flex transition-transform duration-1000 ease-in-out h-full">
+        <img class="min-w-full h-full object-cover" src="img/porcion de fideo.png" alt="">
+        <img class="min-w-full h-full object-cover" src="img/chuleta de cerdo.png" alt="">
+        <img class="min-w-full h-full object-cover" src="img/lomo saltado de pollo con arroz blanco.png" alt="">
+        <img class="min-w-full h-full object-cover" src="img/oferton sin ensalada.png" alt="">
+        <img class="min-w-full h-full object-cover" src="img/chaufa brasa.png" alt="">
+        <img class="min-w-full h-full object-cover" src="img/bistec a lo pobre.png" alt="">
+        <img class="min-w-full h-full object-cover" src="img/oferton con fideo.png" alt="">
+        <img class="min-w-full h-full object-cover" src="img/pechuga a la plancha.png" alt="">
+        <img class="min-w-full h-full object-cover" src="img/tallarin saltado de carne.png" alt="">
+        <img class="min-w-full h-full object-cover" src="img/oferton mas chaufa.png" alt="">
+      </div>
+    </div>
+  </section>
+  <!-- Fin Banner / Carrusel -->
+
+  <div>
+    <div class="aviso">
+      <h2 >Realice su pedido ahora mismo</h2>
+  </div>
+
+  <!-- Menú -->
+  <section class="py-5 px-5 sm:px-6 md:px-4 bg-gray-50 shadow-inner">
+    <div class="max-w-6xl 2xl:max-w-[1600px] mx-auto">
+      <h2 class="text-2xl font-bold text-center mb-5 text-red-800"> Nuestro Menú</h2>
+
+      <!-- Botones de categorías -->
+      <div class="mb-4 bg-[#C4362E]"></div>
+      <!-- =================== CATEGORÍAS PRO (con flecha) =================== -->
+<div class="mb-1">
+  <h3 class="text-1xl  text-gray-600 mb-2">
+    Selecciona tus Productos
+  </h3>
+
+  <div class="catbar">
+    <!-- Zona scroll -->
+    <div id="catbar-scroll" class="catbar__scroll scrollbar-hide">
+      <div class="catbar__row">
+
+        <!-- NUEVO: TODO EL MENÚ -->
+        <button class="category-btn catbtn is-active" data-category="todo-el-menu" type="button">
+          🔥 <span>Todo el Menú</span>
+        </button>
+
+        <button id="ofertas" class="category-btn catbtn" data-category="ofertas-familiares" type="button">
+          👨‍👩‍👧‍👦 <span>Familiares</span>
+
+        </button>
+
+        <button class="category-btn catbtn" data-category="ofertas-dos" type="button">
+          👫 <span>Para Dos</span>
+        </button>
+
+        <button class="category-btn catbtn" data-category="ofertas-personales" type="button">
+          🧑 <span>Personales</span>
+        </button>
+
+        <button class="category-btn catbtn" data-category="platos-extras" type="button">
+          🍽️ <span>Extras</span>
+        </button>
+
+        <button class="category-btn catbtn" data-category="agregados" type="button">
+          ➕ <span>Agregados</span>
+        </button>
+
+        <button class="category-btn catbtn" data-category="bebidas" type="button">
+         🥤 <span>Bebidas</span>
+        </button>
+
+<button class="category-btn catbtn" data-category="descartables" type="button">
+  🍴 <span>Descartables</span>
+</button>
+
+
+      </div>
+    </div>
+
+    <!-- Flecha para avanzar (como en tu imagen) -->
+    <button id="catbar-next" class="catbar__next" type="button" aria-label="Siguiente">
+      ›
+    </button>
+  </div>
+</div>
+<!-- ================================================================ -->
+
+
+      
+
+
+      <!-- Tarjetas de productos -->
+      <div id="products-container" class="products-grid"></div>
+
+    </div>
+  </section>
+
+
+
+
+  <!-- Carrito flotante -->
+  <div id="floating-cart"
+       class="floating-cart bg-yellow-400 text-red-600 px-5 py-2 rounded-2xl  font-bold hover:bg-yellow-300 transition flex items-center gap-2 cursor-pointer">
+    <div class="flex items-center gap-1">
+      <span class="text-2xl">🛒</span>
+      <div>
+       
+        <!-- <div class="font-bold">Mi Carrito</div> -->
+        <div class="text-sm">
+          <span id="floating-cart-count">0</span> Ver Carrito
+          <span id="floating-cart-total" class="cart-total ">$0</span>
+          
+        </div>
+      </div>
+      <!-- <span id="floating-cart-badge"
+          class="cart-badge bg-yellow-400 text-red-900 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold ml-2">0</span> -->
+    </div>
+  </div>
+
+     <!-- NUEVOS MODALES PARA DELIVERY / RESERVAS / RETIROS -->
+
+  <!-- Modal DELIVERY -->
+  <div id="modal-delivery" class="modal">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 my-8">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-red-800">🚚 Pedido con Delivery</h3>
+        <button id="modal-delivery-close" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+      </div>
+      <p class="text-sm text-gray-700 mb-3">
+        Esta plataforma está diseñada para que realices tu pedido con
+        <strong>entrega a domicilio</strong>.
+      </p>
+      <p class="text-sm text-gray-700 mb-2 font-semibold">
+        ¿Cómo hacer tu pedido por delivery?
+      </p>
+      <ul class="text-sm text-gray-700 list-disc pl-5 space-y-1 mb-4">
+        <li>Elige tus combos y platos desde el menú.</li>
+        <li>Agrega los productos al carrito presionando <strong>“Agregar”</strong>.</li>
+        <li>Cuando termines, abre <strong>“Mi Carrito”</strong> y revisa tu pedido.</li>
+        <li>Presiona <strong>“Realizar Pedido por WhatsApp”</strong>.</li>
+        <li>Completa tus datos y confirma el envío del mensaje.</li>
+      </ul>
+      <p class="text-xs text-gray-500">
+        * Recuerda que el delivery tiene un costo adicional según tu zona
+        (aprox. $2.500 a $4.000).
+      </p>
+    </div>
+  </div>
+
+  <!-- Modal RESERVAS -->
+  <div id="modal-reservas" class="modal">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 my-8">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-red-800">📅 Reservas</h3>
+        <button id="modal-reservas-close" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+      </div>
+      <p class="text-sm text-gray-700 mb-3">
+        Para realizar una <strong>reserva</strong> en Pollería El Pollón se requiere:
+      </p>
+      <ul class="text-sm text-gray-700 list-disc pl-5 space-y-1 mb-4">
+        <li>Monto mínimo de consumo: <strong>$200.000</strong>.</li>
+        <li>Reserva sujeta a disponibilidad de horario en el local.</li>
+        <li>La confirmación se realiza directamente con nuestro equipo.</li>
+      </ul>
+      <p class="text-xs text-gray-500 mb-4">
+        * Una vez enviada tu solicitud, nos pondremos en contacto para confirmar
+        el horario y los detalles de tu reserva.
+      </p>
+      <button
+        id="modal-reserva-go"
+        class="w-full bg-red-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-red-700 text-sm"
+      >
+        Realizar mi reserva
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal RETIROS -->
+  <div id="modal-retiros" class="modal">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 my-8">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-red-800">🛍️ Pedido con Retiro en Local</h3>
+        <button id="modal-retiros-close" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+      </div>
+      <p class="text-sm text-gray-700 mb-3">
+        Para realizar un <strong>pedido con retiro</strong> en el local:
+      </p>
+      <ul class="text-sm text-gray-700 list-disc pl-5 space-y-1 mb-4">
+        <li>Monto mínimo de compra: <strong>$100.000</strong>.</li>
+        <li>Debes coordinar tu pedido con <strong>mínimo 2 horas de anticipación</strong>.</li>
+        <li>La hora de retiro se confirma por WhatsApp.</li>
+      </ul>
+      <p class="text-xs text-gray-500 mb-4">
+        * Este canal es exclusivo para pedidos grandes con retiro en local.
+      </p>
+      <button
+        id="modal-retiro-go"
+        class="w-full bg-green-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-700 text-sm"
+      >
+        Solicitar con retiro
+      </button>
+    </div>
+  </div>
+
+
+  <!-- Modal opciones producto -->
+  <div id="options-modal" class="modal">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+      <h3 class="text-2xl font-bold mb-4 text-red-800">Personaliza tu pedido</h3>
+
+      <!-- Bebidas -->
+      <div id="drink-section" class="mb-6 hidden">
+        <div class="flex items-center justify-between mb-2">
+          <label class="block font-bold text-gray-800 text-sm md:text-base">
+            BEBIDAS —
+            <span class="text-gray-600 font-normal">elija su sabor</span>
+          </label>
+          <span class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-semibold">Obligatorio</span>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="flex items-center gap-3 p-3 border-2 border-gray-300 rounded-lg hover:border-red-500 cursor-pointer drink-option-label">
+            <input type="radio" name="drink" class="drink-radio" value="Coca Cola">
+            <span class="font-semibold text-gray-800">COCA COLA</span>
+          </label>
+          <label class="flex items-center gap-3 p-3 border-2 border-gray-300 rounded-lg hover:border-red-500 cursor-pointer drink-option-label">
+            <input type="radio" name="drink" class="drink-radio" value="Inca Kola">
+            <span class="font-semibold text-gray-800">INCA KOLA</span>
+          </label>
+          <label class="flex items-center gap-3 p-3 border-2 border-gray-300 rounded-lg hover:border-red-500 cursor-pointer drink-option-label">
+            <input type="radio" name="drink" class="drink-radio" value="Coca Cero">
+            <span class="font-semibold text-gray-800">COCA CERO</span>
+          </label>
+          <label class="flex items-center gap-3 p-3 border-2 border-gray-300 rounded-lg hover:border-red-500 cursor-pointer drink-option-label">
+            <input type="radio" name="drink" class="drink-radio" value="Sprite">
+            <span class="font-semibold text-gray-800">SPRITE</span>
+          </label>
+          <label class="flex items-center gap-3 p-3 border-2 border-gray-300 rounded-lg hover:border-red-500 cursor-pointer drink-option-label col-span-2">
+            <input type="radio" name="drink" class="drink-radio" value="Fanta">
+            <span class="font-semibold text-gray-800">FANTA</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Bolsa ecológica -->
+      <div id="bag-section" class="mb-4">
+        <div class="flex items-center justify-between mb-2">
+          <label class="block font-bold text-gray-800 text-sm md:text-base">BOLSA ECOLÓGICA</label>
+          <span id="bag-badge" class="text-xs px-2 py-1 rounded-full font-semibold"></span>
+        </div>
+        <div id="bag-options" class="grid grid-cols-2 gap-3"></div>
+        <p id="bag-note" class="text-xs text-gray-600 mt-3"></p>
+      </div>
+
+      <!-- Cantidad -->
+      <div class="mb-4">
+        <label class="block font-bold mb-2 text-gray-700">Cantidad:</label>
+        <div class="flex items-center gap-4">
+          <button type="button" id="decrease-quantity"
+                  class="w-12 h-12 bg-gray-300 text-gray-700 rounded-full font-bold text-2xl hover:bg-gray-400">-</button>
+          <span id="product-quantity"
+                class="text-3xl font-bold text-gray-800 min-w-[60px] text-center">1</span>
+          <button type="button" id="increase-quantity"
+                  class="w-12 h-12 bg-red-600 text-white rounded-full font-bold text-2xl hover:bg-red-700">+</button>
+        </div>
+      </div>
+
+      <!-- Total -->
+      <div class="mb-6">
+        <div class="text-xl font-extrabold text-red-800">
+          Total: <span id="live-total">$0</span>
+        </div>
+      </div>
+
+      <div class="flex gap-3">
+        <button id="cancel-options"
+                class="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg font-bold hover:bg-gray-400">Cancelar</button>
+        <button id="confirm-add"
+                class="flex-1 bg-red-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-red-700">Agregar al Carrito</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal carrito -->
+  <div id="cart-modal" class="modal">
+    <div class="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 my-8">
+      <div class="flex justify-between items-center mb-6">
+        <h3 class="text-2xl font-bold text-red-800">🛒 Tu Carrito</h3>
+        <button id="close-cart" class="text-gray-500 hover:text-gray-700 text-3xl">×</button>
+      </div>
+      <div id="cart-items" class="mb-6 max-h-96 overflow-y-auto"></div>
+      <div class="border-t-2 pt-4 mb-6">
+        <div class="flex justify-between items-center text-xl font-bold text-red-800">
+          <span>Total:</span><span id="cart-total">$0</span>
+        </div>
+      </div>
+      <button id="checkout-btn"
+              class="w-full bg-green-600 text-white px-6 py-4 rounded-lg font-bold text-lg hover:bg-green-700">
+        💬 Realizar Pedido por WhatsApp
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal checkout -->
+  <div id="checkout-modal" class="modal">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+      <h3 class="text-2xl font-bold mb-4 text-red-800">📝 Datos de Entrega</h3>
+      <form id="checkout-form">
+        <div class="mb-4">
+          <label class="block font-bold mb-2 text-gray-700">Nombre Completo:</label>
+          <input type="text" id="customer-name" required
+                 class="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-red-500 focus:outline-none"
+                 placeholder="Ej: Juan Pérez">
+        </div>
+        <div class="mb-4">
+          <label class="block font-bold mb-2 text-gray-700">Dirección de Entrega:</label>
+          <textarea id="customer-address" required
+                    class="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-red-500 focus:outline-none"
+                    rows="3" placeholder="Ej: Av. Principal 123, Iquique"></textarea>
+        </div>
+        <div class="mb-6">
+          <label class="block font-bold mb-2 text-gray-700">Número de Teléfono:</label>
+          <input type="tel" id="customer-phone" required
+                 class="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-red-500 focus:outline-none"
+                 placeholder="+56 9 8692 5310">
+        </div>
+        <div class="flex gap-3">
+          <button type="button" id="cancel-checkout"
+                  class="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg font-bold hover:bg-gray-400">Cancelar</button>
+          <button type="submit"
+                  class="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-green-700">
+            📤 Enviar Mi Pedido
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Asistente virtual tipo chatbot -->
+  <div id="chatbot-toggle" class="chatbot-toggle">
+    <!-- <span>🟢</span><span></span> -->
+  </div>
+
+  <div id="chatbot-panel" class="chatbot-panel hidden">
+    <div class="chatbot-header">
+      <div class="chatbot-header-left">
+        <!-- <div class="chatbot-avatar">🟢</div> -->
+        <div>
+          <div class="text-xs opacity-80">Asistente virtual</div>
+          <div class="text-sm font-semibold">El Pollón Iquique</div>
+        </div>
+      </div>
+      <button id="chatbot-close" class="text-white text-lg leading-none">&times;</button>
+    </div>
+    <div id="chatbot-messages" class="chatbot-body flex flex-col"></div>
+    <div class="chatbot-quick-actions">
+      <button class="chatbot-chip" data-action="familiares">👨‍👩‍👧‍👦 Combos Familiares</button>
+      <button class="chatbot-chip" data-action="horarios">🕐 Horarios y dirección</button>
+      <button class="chatbot-chip" data-action="delivery">🚚 Delivery y zonas</button>
+      <button class="chatbot-chip" data-action="pedido">💬 Hacer un pedido</button>
+      <button class="chatbot-chip" data-action="pagos">💳 Métodos de pago</button>
+      <button class="chatbot-chip" data-action="redes">📲 Redes sociales</button>
+    </div>
+  </div>
+
+  <!-- Modal login Admin -->
+  <div id="admin-login-modal" class="modal">
+    <div class="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+      <h3 class="text-xl font-bold mb-2 text-gray-900 flex items-center gap-2">
+        <span>🔐</span><span>Acceso Administración</span>
+      </h3>
+      <p class="text-sm text-gray-600 mb-4">
+        Panel privado para gestión de pedidos de <strong>Pollería El Pollón</strong>.
+      </p>
+      <label class="block text-sm font-semibold text-gray-700 mb-2">Contraseña de acceso</label>
+      <input type="password" id="admin-password"
+             class="w-full border-2 border-gray-300 rounded-lg p-2 mb-3 focus:outline-none focus:border-red-500"
+             placeholder="Ingresa la contraseña">
+      <p id="admin-login-error" class="text-xs text-red-600 mb-3 hidden">
+        Contraseña incorrecta. Intente nuevamente.
+      </p>
+      <div class="flex gap-3">
+        <button id="admin-login-cancel"
+                class="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300">Cancelar</button>
+        <button id="admin-login-submit"
+                class="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700">Ingresar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Panel Admin -->
+  <div id="admin-panel-modal" class="modal">
+    <div class="bg-white rounded-lg p-6 max-w-5xl w-full mx-4 my-8">
+      <div class="flex justify-between items-start mb-4 gap-4 flex-wrap">
+        <div>
+          <h3 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <span>📊</span><span>Panel de Administración</span>
+          </h3>
+          <p class="text-sm text-gray-600">
+            Gestión de pedidos recibidos desde la carta digital y WhatsApp.
+          </p>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-gray-500">
+          <span class="admin-badge admin-badge-pendiente">Pendiente</span>
+          <span class="admin-badge admin-badge-preparacion">En preparación</span>
+          <span class="admin-badge admin-badge-entregado">Entregado</span>
+          <span class="admin-badge admin-badge-cancelado">Cancelado</span>
+        </div>
+      </div>
+
+      <!-- Stats fila 1 -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div class="admin-stat-card">
+          <div class="admin-stat-label">Total pedidos</div>
+          <div id="admin-stat-total" class="admin-stat-value">0</div>
+        </div>
+        <div class="admin-stat-card">
+          <div class="admin-stat-label">Pedidos hoy</div>
+          <div id="admin-stat-hoy" class="admin-stat-value">0</div>
+        </div>
+        <div class="admin-stat-card">
+          <div class="admin-stat-label">Ventas hoy</div>
+          <div id="admin-stat-ventas-hoy" class="admin-stat-value">$0</div>
+        </div>
+        <div class="admin-stat-card">
+          <div class="admin-stat-label">Pendientes</div>
+          <div id="admin-stat-pendientes" class="admin-stat-value">0</div>
+        </div>
+      </div>
+
+      <!-- Stats fila 2 -->
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+        <div class="admin-stat-card">
+          <div class="admin-stat-label">% pedidos entregados</div>
+          <div id="admin-stat-entregados-pct" class="admin-stat-value">0%</div>
+        </div>
+        <div class="admin-stat-card">
+          <div class="admin-stat-label">Ticket promedio</div>
+          <div id="admin-stat-ticket-promedio" class="admin-stat-value">$0</div>
+        </div>
+        <div class="admin-stat-card">
+          <div class="admin-stat-label">Tiempo prom. entrega</div>
+          <div id="admin-stat-tiempo-prom" class="admin-stat-value">0 min</div>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="mt-4 mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs md:text-sm">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+          <div>
+            <label class="block font-semibold text-gray-700 mb-1">Desde</label>
+            <input type="date" id="admin-filter-from"
+                   class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs md:text-sm">
+          </div>
+          <div>
+            <label class="block font-semibold text-gray-700 mb-1">Hasta</label>
+            <input type="date" id="admin-filter-to"
+                   class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs md:text-sm">
+          </div>
+          <div>
+            <label class="block font-semibold text-gray-700 mb-1">Estado</label>
+            <select id="admin-filter-status"
+                    class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs md:text-sm">
+              <option value="todos">Todos</option>
+              <option value="Pendiente">Pendiente</option>
+              <option value="En preparación">En preparación</option>
+              <option value="Entregado">Entregado</option>
+              <option value="Cancelado">Cancelado</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-gray-700 mb-1">Buscar (nombre / teléfono)</label>
+            <input type="text" id="admin-filter-search"
+                   class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs md:text-sm"
+                   placeholder="Ej: Juan, +569...">
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2 justify-between items-center">
+          <div class="text-[11px] text-gray-600">
+            Pedidos en el rango seleccionado:
+            <span id="admin-filter-count" class="font-semibold">0</span>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="admin-copy"
+                    class="px-3 py-1 rounded-md bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-semibold text-[11px] md:text-xs">
+              📋 Copiar pedidos (Excel)
+            </button>
+            <button id="admin-refresh"
+                    class="px-3 py-1 rounded-md bg-sky-100 text-sky-800 hover:bg-sky-200 font-semibold text-[11px] md:text-xs">
+              🔃 Actualizar
+            </button>
+            <button id="admin-filter-clear"
+                    class="px-3 py-1 rounded-md bg-gray-200 text-gray-800 hover:bg-gray-300 font-semibold text-[11px] md:text-xs">
+              ✖ Limpiar filtros
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla pedidos -->
+      <div class="border border-gray-200 rounded-lg overflow-hidden max-h-80 overflow-y-auto text-sm">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">ID</th>
+              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">Cliente</th>
+              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">Teléfono</th>
+              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">Total</th>
+              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">Estado</th>
+              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">Fecha/Hora</th>
+              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="admin-orders-body" class="bg-white divide-y divide-gray-100"></tbody>
+        </table>
+      </div>
+
+      <div class="flex justify-end mt-4">
+        <button id="admin-close"
+                class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-900">
+          Cerrar panel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== SECTION COMBOS (PEGAR TAL CUAL) ===================== -->
+<section class="pollon-combos">
+  <div class="combo-wrap">
+
+    <!-- CARD 1 -->
+    <article class="combo-card">
+      <div class="combo-media">
+        <!-- Reemplaza la ruta por tu imagen -->
+        <img class="combo-img" src="img/oferton mas chaufa.png" alt="Combo con bebida" />
+
+        <!-- Textos encima de la imagen -->
+        <div class="combo-sticker">
+          <div class="sticker-top">PIDE TU POLLITO</div>
+          <div class="sticker-big">CON BEBIDA</div>
+        </div>
+      </div>
+
+      <div class="combo-content">
+        <h3>Todo es mejor en<br />Combo</h3>
+        <p>
+          Disfruta de nuestro delicioso pollito a la brasa con tu bebida preferida.
+          ¡La combinación perfecta para un momento único!
+        </p>
+
+        <a class="combo-btn" href="#ofertas">Pídelo aquí</a>
+      </div>
+    </article>
+
+    <!-- CARD 2 -->
+    <article class="combo-card">
+      <div class="combo-media">
+        <!-- Reemplaza la ruta por tu imagen -->
+        <img class="combo-img" src="img/lomo saltado de pollo con arroz blanco.png" alt="Complementos" />
+
+        <!-- Textos encima de la imagen -->
+        <div class="combo-sticker">
+          <div class="sticker-top">DISFRÚTALO DE</div>
+          <div class="sticker-big">DIFERENTES<br />MANERAS</div>
+        </div>
+      </div>
+
+      <div class="combo-content">
+        <h3>Elige tu<br />complemento<br />perfecto</h3>
+        <p>
+          Acompaña tu pollo con el complemento ideal y disfruta de un sabor único en cada bocado.
+          ¡Tu combinación perfecta te espera!
+        </p>
+
+        <a class="combo-btn" href="#menu">Ver más</a>
+      </div>
+    </article>
+
+  </div>
+</section>
+<!-- ===================== FIN SECTION COMBOS ===================== -->
+
+
+  <!-- Ubicación -->
+   <!-- ===== UBICACIÓN PRO EL POLLÓN ===== -->
+ <section class="location-pro">
+  <div class="max-w-7xl mx-auto px-4">
+
+    <!-- Título -->
+    <div class="location-header">
+      <span class="location-pin"></span>
+      <h2>Nuestra Ubicación</h2>
+      <p>Visítanos en nuestro local en el centro de Iquique</p>
+    </div>
+
+    <!-- Tarjeta -->
+    <div class="location-card">
+
+      <!-- Mapa -->
+      <div class="location-map">
+        <iframe
+          src="https://www.google.com/maps?q=Calle+Vivar+1086,+Iquique,+Chile&hl=es&z=18&t=k&output=embed"
+          allowfullscreen
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade">
+        </iframe>
+      </div>
+
+      <!-- Info -->
+      <div class="location-info">
+        <h3>🏪 Pollería El Pollón</h3>
+
+        <ul>
+          <li>
+            <span>📍</span>
+            Calle Vivar 1086, Iquique, Chile
+          </li>
+          <li>
+            <span>📞</span>
+            <a href="tel:+56986925310">+56 9 8692 5310</a>
+          </li>
+          <li>
+            <span>🕐</span>
+            Lunes a Domingo: 11:30 – 23:00
+          </li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+ </section>
+
+  
+
+  <!-- Sección Administración visible al final -->
+  <section class="py-10 px-4 bg-gray-100">
+    <div class="max-w-7xl mx-auto">
+      <div class="bg-white border border-gray-200 rounded-xl p-6 text-gray-900 shadow">
+        <h2 class="text-2xl font-bold mb-2 flex items-center gap-2">
+          <span>🛠️</span><span>correo electronico</span>
+        </h2>
+        <p class="text-sm text-gray-600 mb-4">
+          <!-- Panel interno para ver, filtrar, copiar e imprimir los pedidos de la carta digital.
+          Solo uso del equipo de Pollería El Pollón. -->
+        </p>
+        <!-- Botón Admin (estático) -->
+        <button id="admin-open-btn"
+                class="hover:bg-gray-100 text-gray-900 px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 shadow">
+          <span>🔐</span><span>ingresar</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <!-- Footer PRO -->
+  <footer class="footer-pro text-white">
+  <div class="max-w-7xl mx-auto px-4 py-12">
+    
+    <!-- Marca (arriba) -->
+    <div class="footer-top">
+      <div class="footer-brand">
+        <div class="footer-brand-left">
+          <div class="footer-logo">
+            <img src="img/logo pollon.png" alt="El Pollón">
+          </div>
+          <div>
+            <h3 class="footer-title">Pollería El Pollón</h3>
+            <p class="footer-subtitle">📍 Iquique, Chile · Pollo a la brasa & comida peruana</p>
+          </div>
+        </div>
+
+      </div>
+
+      
+    </div>
+
+    <!-- Grid principal -->
+    <div class="footer-grid">
+
+      <!-- CONTACTO -->
+      <div class="footer-card">
+        <h4 class="footer-card-title">Contacto</h4>
+        <ul class="footer-list">
+          <li>
+            <span class="footer-ico">📞</span>
+            <a class="footer-link" href="tel:+56986925310">+56 9 8692 5310</a>
+          </li>
+          <li>
+            <span class="footer-ico">📍</span>
+            <span>Calle Vivar 1086, Iquique</span>
+          </li>
+          <li>
+            <span class="footer-ico">🕐</span>
+            <span>Lun–Dom: 11:30 – 23:00</span>
+          </li>
+          <li>
+            <span class="footer-ico">✉️</span>
+            <a class="footer-link" href="mailto:contacto@elpollon.cl">contacto@elpollon.cl</a>
+          </li>
+        </ul>
+
+        <div class="footer-mini-note">
+          <span class="dot"></span>
+          Respuesta rápida por WhatsApp en horario de atención.
+        </div>
+      </div>
+
+      <!-- LEGAL / AYUDA -->
+      <div class="footer-card">
+        <h4 class="footer-card-title">Legal y Ayuda</h4>
+        <ul class="footer-list">
+          <li>
+            <span class="footer-ico">📋</span>
+            <a class="footer-link" href="#">Libro de Reclamaciones</a>
+          </li>
+          <li>
+            <span class="footer-ico">🔒</span>
+            <a class="footer-link" href="#">Política de Privacidad</a>
+          </li>
+          <li>
+            <span class="footer-ico">📜</span>
+            <a class="footer-link" href="#">Términos y Condiciones</a>
+          </li>
+          <li>
+            <span class="footer-ico">🚚</span>
+            <a class="footer-link" href="#modal-delivery">Zonas y costo de delivery</a>
+          </li>
+        </ul>
+
+        <div class="footer-tags">
+          <span class="tag">✅ Calidad</span>
+          <span class="tag">🔥 Recién hecho</span>
+          
+        </div>
+      </div>
+
+      <!-- MÉTODO DE PAGO (2 BLOQUES) -->
+      <div class="footer-card">
+        <h4 class="footer-card-title">Métodos de Pago</h4>
+
+        <!-- Local -->
+        <div class="pay-box">
+          <div class="pay-head">
+            <span class="pay-badge pay-local">En el local</span>
+          </div>
+          <div class="pay-items">
+            <span class="pay-pill">💵 Efectivo</span>
+            <span class="pay-pill">💳 Tarjeta</span>
+          </div>
+          <p class="pay-note">Pago presencial en caja.</p>
+
+          
+        </div>
+
+        <!-- Delivery -->
+        <div class="pay-box">
+          <div class="pay-head">
+            <span class="pay-badge pay-delivery">Delivery</span>
+          </div>
+          <div class="pay-items">
+            <span class="pay-pill">💵 Solo efectivo</span>
+          </div>
+          <p class="pay-note">Pago contra entrega.</p>
+        </div>
+      </div>
+
+      <!-- REDES SOCIALES (ICONOS REALES EN SVG) -->
+      
+
+    </div>
+     <div style="height: 2px; background: linear-gradient(90deg, transparent 0%, rgb(191, 107, 107) 50%, transparent 100%); margin: 40px 0;"></div>
+     <div style="text-align: center;">
+      <div style="font-size: 16px; color: rgba(0, 0, 0, 0.7); margin-bottom: 20px; font-weight: 700;">
+       Síguenos en Redes Sociales
+      </div>
+      <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;"><a href="https://www.facebook.com" target="_blank" rel="noopener noreferrer" style="width: 60px; height: 60px; background: linear-gradient(135deg, #1877F2 0%, #0C63D4 100%); border-radius: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 16px rgba(24, 119, 242, 0.3); text-decoration: none;" onmouseover="this.style.transform='translateY(-5px) scale(1.05)'; this.style.boxShadow='0 8px 24px rgba(24, 119, 242, 0.5)'" onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 4px 16px rgba(24, 119, 242, 0.3)'">
+        <svg width="32" height="32" viewbox="0 0 24 24" fill="white"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+        </svg></a> <a href="https://www.instagram.com" target="_blank" rel="noopener noreferrer" style="width: 60px; height: 60px; background: linear-gradient(135deg, #E1306C 0%, #C13584 50%, #833AB4 100%); border-radius: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 16px rgba(225, 48, 108, 0.3); text-decoration: none;" onmouseover="this.style.transform='translateY(-5px) scale(1.05)'; this.style.boxShadow='0 8px 24px rgba(225, 48, 108, 0.5)'" onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 4px 16px rgba(225, 48, 108, 0.3)'">
+        <svg width="32" height="32" viewbox="0 0 24 24" fill="white"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+        </svg></a> <a href="https://www.tiktok.com" target="_blank" rel="noopener noreferrer" style="width: 60px; height: 60px; background: linear-gradient(135deg, #000000 0%, #a79898 100%); border-radius: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); text-decoration: none;" onmouseover="this.style.transform='translateY(-5px) scale(1.05)'; this.style.boxShadow='0 8px 24px rgba(0, 0, 0, 0.5)'" onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 4px 16px rgba(0, 0, 0, 0.3)'">
+        <svg width="28" height="28" viewbox="0 0 24 24" fill="white"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
+        </svg></a>
+      </div>
+     </div>
+    </div>
+
+    <div class="footer-bottom">
+      <p>© 2024 Pollería El Pollón - Iquique, Chile. Todos los derechos reservados.</p>
+      <p class="small">Desarrollado con ❤️ para los amantes del buen pollo a la brasa</p>
+    </div>
+
+  </div>
+  </footer>
+
+
+  <!-- =================== FIREBASE (BASE DE DATOS EN LÍNEA) =================== -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <!-- ======================================================================== -->
+
+  <!-- =================== PANEL MENÚ (SOLO PC/TABLET) =================== -->
+ <div id="desktop-menu-overlay" class="desktop-menu-overlay hidden">
+  <div class="desktop-menu-panel">
+
+    <button id="menu-close-desktop" class="desktop-menu-close" aria-label="Cerrar">×</button>
+
+    <!-- ✅ LINKS (AHORA SON TUS CATEGORÍAS) -->
+    <nav class="desktop-menu-links">
+      <button class="desktop-menu-link-btn" data-category="ofertas-familiares">Ofertas Familiares</button>
+      <button class="desktop-menu-link-btn" data-category="ofertas-dos">Ofertas para Dos</button>
+      <button class="desktop-menu-link-btn" data-category="ofertas-personales">Ofertas Personales</button>
+      <button class="desktop-menu-link-btn" data-category="platos-extras">Platos Extras</button>
+      <button class="desktop-menu-link-btn" data-category="agregados">Agregados</button>
+      <button class="desktop-menu-link-btn" data-category="bebidas">Bebidas</button>
+      <button class="desktop-menu-link-btn" data-category="descartables">Descartables</button>
+    </nav>
+
+    <!-- 👇 desde aquí sigue normal tu galería -->
+    <h3 class="desktop-menu-title">GALERÍA</h3>
+
+    <!-- Mini galería: primeras fotos por categoría -->
+    <div class="desktop-menu-grid">
+      <button class="desktop-menu-card" data-category="ofertas-familiares">
+        <img src="img/oferton mas chaufa.png" alt="Familiares">
+      </button>
+
+      <button class="desktop-menu-card" data-category="ofertas-dos">
+        <img src="img/medio combo.png" alt="Para dos">
+      </button>
+
+      <button class="desktop-menu-card" data-category="ofertas-personales">
+        <img src="img/personal combo.png" alt="Personales">
+      </button>
+
+      <button class="desktop-menu-card" data-category="platos-extras">
+        <img src="img/lomo saltado con chaufa.png" alt="Extras">
+      </button>
+
+      <button class="desktop-menu-card" data-category="agregados">
+        <img src="img/porcion de papa.png" alt="Agregados">
+      </button>
+
+      <button class="desktop-menu-card" data-category="bebidas">
+        <img src="img/bebida_cocacola.png" alt="Bebidas">
+      </button>
+
+      <button class="desktop-menu-card" data-category="descartables">
+        <img src="img/desc_ct5.png" alt="Descartables">
+      </button>
+    </div>
+
+  </div>
+ </div>
+<!-- ================= FIN PANEL MENÚ (PC/TABLET) ================= -->
+
+
+
+  <!-- JS principal -->
+  <script src="js/app.js"></script>
+  <!-- JS extra admin (por ahora vacío / opcional) -->
+  <script src="js/admin.js"></script>
+</body>
+</html>

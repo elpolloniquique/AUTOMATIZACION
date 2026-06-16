@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { width: 1080px; height: 1080px; font-family: 'Segoe UI', Arial, sans-serif; }
+  .card {
+    width: 1080px; height: 1080px;
+    background: linear-gradient(135deg, #25d366 0%, #128c7e 40%, #1a1a1a 40%);
+    display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative;
+  }
+  .scooter { font-size: 200px; position: absolute; top: 80px; right: 60px; }
+  .main { text-align: center; padding: 60px; }
+  .delivery-badge { background: #fff; color: #25d366; font-size: 40px; font-weight: 900; padding: 15px 50px; border-radius: 50px; display: inline-block; margin-bottom: 30px; }
+  .title { color: #fff; font-size: 80px; font-weight: 900; line-height: 1.1; text-shadow: 3px 3px 0 rgba(0,0,0,0.5); }
+  .subtitle { color: #f5a623; font-size: 42px; font-weight: 700; margin: 20px 0; }
+  .price-tag { background: {{brandColor}}; color: #fff; font-size: 56px; font-weight: 900; padding: 20px 60px; border-radius: 20px; margin: 30px auto; display: inline-block; }
+  .cta-box { background: #fff; color: #1a1a1a; font-size: 36px; font-weight: 800; padding: 25px 50px; border-radius: 60px; margin-top: 40px; }
+  .branch { color: rgba(255,255,255,0.9); font-size: 28px; margin-top: 20px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="scooter">🛵</div>
+  <div class="main">
+    <div class="delivery-badge">DELIVERY RÁPIDO</div>
+    <h1 class="title">{{offerTitle}}</h1>
+    <p class="subtitle">Llega caliente a tu puerta</p>
+    <div class="price-tag">{{price}}</div>
+    <div class="cta-box">{{cta}}</div>
+    <p class="branch">📍 {{branchName}}</p>
+  </div>
+</div>
+</body>
+</html>
