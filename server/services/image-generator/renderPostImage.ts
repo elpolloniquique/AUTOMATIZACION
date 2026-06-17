@@ -94,13 +94,18 @@ function fillTemplate(html: string, vars: Record<string, string>): string {
 }
 
 async function launchBrowser() {
-  const isVercel = process.env.VERCEL === '1';
+  const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL_ENV;
 
   if (isVercel) {
-    const chromium = await import('@sparticuz/chromium');
+    const chromiumPack = (await import('@sparticuz/chromium')).default;
+    chromiumPack.setGraphicsMode = false;
+
+    const executablePath = await chromiumPack.executablePath();
+    process.env.LD_LIBRARY_PATH = dirname(executablePath);
+
     return playwrightChromium.launch({
-      args: chromium.default.args,
-      executablePath: await chromium.default.executablePath(),
+      args: [...chromiumPack.args, '--no-sandbox', '--disable-setuid-sandbox'],
+      executablePath,
       headless: true,
     });
   }
@@ -125,7 +130,11 @@ async function renderHtmlToPng(html: string): Promise<Buffer> {
     return Buffer.from(screenshot);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes('Executable doesn') || msg.includes('browserType.launch')) {
+    const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL_ENV;
+    if (
+      !isVercel &&
+      (msg.includes('Executable doesn') || msg.includes('browserType.launch'))
+    ) {
       throw new Error(
         'Playwright no instalado. En tu PC ejecuta: npx playwright install chromium'
       );
