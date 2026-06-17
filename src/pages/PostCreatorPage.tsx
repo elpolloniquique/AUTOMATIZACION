@@ -110,6 +110,10 @@ export default function PostCreatorPage() {
   async function generateImage() {
     const branch = branches.find((b) => b.id === watched.branch_id);
     if (!branch || !session?.access_token) return;
+    if (!watched.title?.trim()) {
+      alert('Escribe un título antes de generar la imagen');
+      return;
+    }
     setImgLoading(true);
     try {
       const slugMap: Record<string, string> = {

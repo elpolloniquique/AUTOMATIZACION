@@ -41,6 +41,15 @@ export async function apiFetch<T>(
 
   const res = await fetch(path, { ...fetchOptions, headers });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || data.message || 'Error en la solicitud');
+  if (!res.ok) {
+    const msg = typeof data.error === 'string'
+      ? data.error
+      : data.error?.fieldErrors
+        ? Object.entries(data.error.fieldErrors as Record<string, string[]>)
+            .map(([k, v]) => `${k}: ${v.join(', ')}`)
+            .join('\n')
+        : data.message || JSON.stringify(data.error) || 'Error en la solicitud';
+    throw new Error(msg);
+  }
   return data as T;
 }

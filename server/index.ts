@@ -14,6 +14,14 @@ import { generateTikTokScript } from './services/tiktok/tiktokPublisher.js';
 import { getSupabaseAdmin } from './utils/supabase.js';
 import { z } from 'zod';
 
+function zodErrorMessage(result: z.SafeParseError<unknown>) {
+  const fieldErrors = result.error.flatten().fieldErrors as Record<string, string[] | undefined>;
+  return Object.entries(fieldErrors)
+    .map(([k, v]) => `${k}: ${v?.join(', ') ?? ''}`)
+    .filter(Boolean)
+    .join('; ') || 'Datos inválidos';
+}
+
 const app = express();
 
 app.use(cors({ origin: config.appUrl, credentials: true }));
@@ -50,7 +58,7 @@ app.post('/api/ai/generate', authMiddleware, async (req, res) => {
   });
 
   const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  if (!parsed.success) return res.status(400).json({ error: zodErrorMessage(parsed) });
 
   try {
     const result = await generateContent({
@@ -75,7 +83,7 @@ app.post('/api/images/generate', authMiddleware, async (req, res) => {
   const schema = z.object({
     template_slug: z.string(),
     branch_name: z.string(),
-    offer_title: z.string(),
+    offer_title: z.string().min(1, 'El título es requerido'),
     price: z.string().optional(),
     product_image_url: z.string().optional(),
     logo_url: z.string().optional(),
@@ -85,7 +93,7 @@ app.post('/api/images/generate', authMiddleware, async (req, res) => {
   });
 
   const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  if (!parsed.success) return res.status(400).json({ error: zodErrorMessage(parsed) });
 
   try {
     const url = await renderPostImage({
@@ -118,7 +126,7 @@ app.post('/api/social/test', authMiddleware, roleGuard('super_admin', 'admin_suc
   });
 
   const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  if (!parsed.success) return res.status(400).json({ error: zodErrorMessage(parsed) });
 
   const { platform, account_id, access_token } = parsed.data;
 
@@ -145,7 +153,7 @@ app.post('/api/social/test', authMiddleware, roleGuard('super_admin', 'admin_suc
 app.post('/api/social/publish-test', authMiddleware, roleGuard('super_admin', 'admin_sucursal'), async (req, res) => {
   const schema = z.object({ post_id: z.string().uuid() });
   const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  if (!parsed.success) return res.status(400).json({ error: zodErrorMessage(parsed) });
 
   const supabase = getSupabaseAdmin();
   const { data: post, error } = await supabase.from('posts').select('*').eq('id', parsed.data.post_id).single();
