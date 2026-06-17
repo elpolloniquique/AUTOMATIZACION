@@ -1,4 +1,4 @@
-import { readFile } from 'fs/promises';
+import { access, readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { chromium as playwrightChromium } from 'playwright-core';
@@ -8,13 +8,21 @@ import { config } from '../../config/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-function getTemplatesDir(): string {
+async function getTemplatesDir(): Promise<string> {
   const candidates = [
     join(__dirname, '../../../templates/social-posts/html'),
     join(process.cwd(), 'templates/social-posts/html'),
     join('/var/task', 'templates/social-posts/html'),
   ];
-  return candidates[0];
+  for (const dir of candidates) {
+    try {
+      await access(join(dir, 'oferta-familiar.html'));
+      return dir;
+    } catch {
+      continue;
+    }
+  }
+  throw new Error('Plantillas HTML no encontradas. Verifica templates/social-posts/html');
 }
 
 export interface RenderPostImageParams {
@@ -53,7 +61,7 @@ export async function renderPostImage(params: RenderPostImageParams): Promise<st
 }
 
 async function loadTemplate(slug: string): Promise<string> {
-  const templatesDir = getTemplatesDir();
+  const templatesDir = await getTemplatesDir();
   const templatePath = join(templatesDir, `${slug}.html`);
   try {
     return await readFile(templatePath, 'utf-8');
@@ -72,6 +80,15 @@ function fillTemplate(html: string, vars: Record<string, string>): string {
   let result = html;
   for (const [key, value] of Object.entries(vars)) {
     result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+    // Eliminar bloques condicionales {{#key}}...{{/key}} si hay valor, o quitar bloque si vacío
+    const blockRegex = new RegExp(`\\{\\{#${key}\\}\\}[\\s\\S]*?\\{\\{/${key}\\}\\}`, 'g');
+    if (value) {
+      result = result.replace(blockRegex, (match) =>
+        match.replace(`{{#${key}}}`, '').replace(`{{/${key}}}`, '')
+      );
+    } else {
+      result = result.replace(blockRegex, '');
+    }
   }
   return result;
 }

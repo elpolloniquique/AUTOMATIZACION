@@ -1,9 +1,11 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { config, validateConfig } from './config/index.js';
 import { startLocalCron } from './scheduler/localCron.js';
 import { authMiddleware } from './utils/authMiddleware.js';
 import { roleGuard, cronGuard } from './utils/roleGuard.js';
+import { asyncHandler } from './utils/asyncHandler.js';
+import { assertBranchAccess, getPostBranchId, HttpError } from './utils/branchAccess.js';
 import { publishDuePosts, publishSinglePost } from './jobs/publishDuePosts.js';
 import { generateContent } from './services/ai/contentGenerator.js';
 import { renderPostImage, AVAILABLE_TEMPLATES } from './services/image-generator/renderPostImage.js';
@@ -22,29 +24,46 @@ function zodErrorMessage(result: z.SafeParseError<unknown>) {
     .join('; ') || 'Datos inválidos';
 }
 
+function getCorsOrigins(): (string | RegExp)[] {
+  const origins: (string | RegExp)[] = [
+    config.appUrl,
+    'http://localhost:5173',
+    /\.vercel\.app$/,
+  ];
+  if (process.env.VERCEL_URL) {
+    origins.push(`https://${process.env.VERCEL_URL}`);
+  }
+  return origins;
+}
+
 const app = express();
 
-app.use(cors({ origin: config.appUrl, credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const allowed = getCorsOrigins();
+    const ok = allowed.some((o) =>
+      o instanceof RegExp ? o.test(origin) : o === origin
+    );
+    callback(null, ok);
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '10mb' }));
 
-// Health check
 app.get('/api/health', (_req, res) => {
-  const warnings = validateConfig();
-  res.json({ status: 'ok', warnings });
-});
-
-// Cron endpoint (GitHub Actions)
-app.post('/api/cron/publish-due-posts', cronGuard, async (_req, res) => {
-  try {
-    const result = await publishDuePosts();
-    res.json({ success: true, ...result });
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Error en cron' });
+  if (config.nodeEnv === 'production') {
+    return res.json({ status: 'ok' });
   }
+  res.json({ status: 'ok', warnings: validateConfig() });
 });
 
-// AI content generation
-app.post('/api/ai/generate', authMiddleware, async (req, res) => {
+app.post('/api/cron/publish-due-posts', cronGuard, asyncHandler(async (_req, res) => {
+  const result = await publishDuePosts();
+  res.json({ success: true, ...result });
+}));
+
+app.post('/api/ai/generate', authMiddleware, asyncHandler(async (req, res) => {
   const schema = z.object({
     branch_id: z.string().uuid(),
     post_id: z.string().uuid().optional(),
@@ -60,29 +79,27 @@ app.post('/api/ai/generate', authMiddleware, async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: zodErrorMessage(parsed) });
 
-  try {
-    const result = await generateContent({
-      branchId: parsed.data.branch_id,
-      postId: parsed.data.post_id,
-      type: parsed.data.type,
-      postType: parsed.data.post_type,
-      branchName: parsed.data.branch_name,
-      city: parsed.data.city,
-      productName: parsed.data.product_name,
-      price: parsed.data.price,
-      customPrompt: parsed.data.custom_prompt,
-    });
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Error generando contenido' });
-  }
-});
+  assertBranchAccess(req.user!, parsed.data.branch_id);
 
-// Image generation
-app.post('/api/images/generate', authMiddleware, async (req, res) => {
+  const result = await generateContent({
+    branchId: parsed.data.branch_id,
+    postId: parsed.data.post_id,
+    type: parsed.data.type,
+    postType: parsed.data.post_type,
+    branchName: parsed.data.branch_name,
+    city: parsed.data.city,
+    productName: parsed.data.product_name,
+    price: parsed.data.price,
+    customPrompt: parsed.data.custom_prompt,
+  });
+  res.json(result);
+}));
+
+app.post('/api/images/generate', authMiddleware, asyncHandler(async (req, res) => {
   const schema = z.object({
     template_slug: z.string(),
     branch_name: z.string(),
+    branch_id: z.string().uuid().optional(),
     offer_title: z.string().min(1, 'El título es requerido'),
     price: z.string().optional(),
     product_image_url: z.string().optional(),
@@ -95,41 +112,44 @@ app.post('/api/images/generate', authMiddleware, async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: zodErrorMessage(parsed) });
 
-  try {
-    const url = await renderPostImage({
-      templateSlug: parsed.data.template_slug,
-      branchName: parsed.data.branch_name,
-      offerTitle: parsed.data.offer_title,
-      price: parsed.data.price,
-      productImageUrl: parsed.data.product_image_url,
-      logoUrl: parsed.data.logo_url,
-      cta: parsed.data.cta,
-      brandColor: parsed.data.brand_color,
-      postId: parsed.data.post_id,
-    });
-    res.json({ url });
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Error generando imagen' });
+  if (parsed.data.branch_id) {
+    assertBranchAccess(req.user!, parsed.data.branch_id);
   }
-});
+
+  const url = await renderPostImage({
+    templateSlug: parsed.data.template_slug,
+    branchName: parsed.data.branch_name,
+    offerTitle: parsed.data.offer_title,
+    price: parsed.data.price,
+    productImageUrl: parsed.data.product_image_url || undefined,
+    logoUrl: parsed.data.logo_url || undefined,
+    cta: parsed.data.cta,
+    brandColor: parsed.data.brand_color || undefined,
+    postId: parsed.data.post_id,
+  });
+  res.json({ url });
+}));
 
 app.get('/api/images/templates', authMiddleware, (_req, res) => {
   res.json(AVAILABLE_TEMPLATES);
 });
 
-// Test social connections
-app.post('/api/social/test', authMiddleware, roleGuard('super_admin', 'admin_sucursal'), async (req, res) => {
+app.post('/api/social/test', authMiddleware, roleGuard('super_admin', 'admin_sucursal'), asyncHandler(async (req, res) => {
   const schema = z.object({
     platform: z.enum(['facebook', 'instagram', 'tiktok', 'google_business']),
     account_id: z.string(),
     access_token: z.string(),
+    branch_id: z.string().uuid().optional(),
   });
 
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: zodErrorMessage(parsed) });
 
-  const { platform, account_id, access_token } = parsed.data;
+  if (parsed.data.branch_id) {
+    assertBranchAccess(req.user!, parsed.data.branch_id);
+  }
 
+  const { platform, account_id, access_token } = parsed.data;
   let result;
   switch (platform) {
     case 'facebook':
@@ -141,48 +161,47 @@ app.post('/api/social/test', authMiddleware, roleGuard('super_admin', 'admin_suc
     case 'google_business':
       result = await testGoogleBusinessConnection(account_id, access_token);
       break;
-    case 'tiktok':
-      result = { ok: false, error: 'TikTok API pendiente de aprobación. Configura OAuth cuando esté disponible.' };
-      break;
+    default:
+      result = { ok: false, error: 'TikTok API pendiente de aprobación.' };
   }
-
   res.json(result);
-});
+}));
 
-// Publish test post
-app.post('/api/social/publish-test', authMiddleware, roleGuard('super_admin', 'admin_sucursal'), async (req, res) => {
+app.post('/api/social/publish-test', authMiddleware, roleGuard('super_admin', 'admin_sucursal'), asyncHandler(async (req, res) => {
   const schema = z.object({ post_id: z.string().uuid() });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: zodErrorMessage(parsed) });
 
   const supabase = getSupabaseAdmin();
+  const branchId = await getPostBranchId(supabase, parsed.data.post_id);
+  assertBranchAccess(req.user!, branchId);
+
   const { data: post, error } = await supabase.from('posts').select('*').eq('id', parsed.data.post_id).single();
   if (error || !post) return res.status(404).json({ error: 'Publicación no encontrada' });
 
   const result = await publishSinglePost(post);
   res.json(result);
-});
+}));
 
-// Retry failed post
-app.post('/api/posts/:id/retry', authMiddleware, async (req, res) => {
+app.post('/api/posts/:id/retry', authMiddleware, roleGuard('super_admin', 'admin_sucursal', 'aprobador'), asyncHandler(async (req, res) => {
   const supabase = getSupabaseAdmin();
-  const { data: post, error } = await supabase.from('posts').select('*').eq('id', req.params.id).single();
+  const postId = String(req.params.id);
+  const branchId = await getPostBranchId(supabase, postId);
+  assertBranchAccess(req.user!, branchId);
+
+  const { data: post, error } = await supabase.from('posts').select('*').eq('id', postId).single();
   if (error || !post) return res.status(404).json({ error: 'Publicación no encontrada' });
 
   await supabase.from('posts').update({ status: 'scheduled', error_message: null }).eq('id', post.id);
   const result = await publishSinglePost(post);
   res.json(result);
-});
+}));
 
-// Approve post
-app.post('/api/posts/:id/approve', authMiddleware, roleGuard('super_admin', 'admin_sucursal', 'aprobador'), async (req, res) => {
+app.post('/api/posts/:id/approve', authMiddleware, roleGuard('super_admin', 'admin_sucursal', 'aprobador'), asyncHandler(async (req, res) => {
   const supabase = getSupabaseAdmin();
-  const { data: post } = await supabase.from('posts').select('branch_id').eq('id', req.params.id).single();
-
-  if (!post) return res.status(404).json({ error: 'Publicación no encontrada' });
-  if (req.user!.role !== 'super_admin' && req.user!.branchId !== post.branch_id) {
-    return res.status(403).json({ error: 'Sin permisos para esta sucursal' });
-  }
+  const postId = String(req.params.id);
+  const branchId = await getPostBranchId(supabase, postId);
+  assertBranchAccess(req.user!, branchId);
 
   const { error } = await supabase
     .from('posts')
@@ -191,40 +210,48 @@ app.post('/api/posts/:id/approve', authMiddleware, roleGuard('super_admin', 'adm
       approved_by: req.user!.id,
       status: 'scheduled',
     })
-    .eq('id', req.params.id);
+    .eq('id', postId);
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
   res.json({ success: true });
-});
+}));
 
-// Reject post
-app.post('/api/posts/:id/reject', authMiddleware, roleGuard('super_admin', 'admin_sucursal', 'aprobador'), async (req, res) => {
+app.post('/api/posts/:id/reject', authMiddleware, roleGuard('super_admin', 'admin_sucursal', 'aprobador'), asyncHandler(async (req, res) => {
   const supabase = getSupabaseAdmin();
+  const postId = String(req.params.id);
+  const branchId = await getPostBranchId(supabase, postId);
+  assertBranchAccess(req.user!, branchId);
+
   const { error } = await supabase
     .from('posts')
     .update({ approval_status: 'rejected', status: 'draft' })
-    .eq('id', req.params.id);
+    .eq('id', postId);
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
   res.json({ success: true });
-});
+}));
 
-// TikTok script
-app.post('/api/tiktok/script', authMiddleware, (req, res) => {
+app.post('/api/tiktok/script', authMiddleware, asyncHandler(async (req, res) => {
   const { caption, post_type } = req.body;
   const script = generateTikTokScript(caption || '', post_type || 'promocion');
   res.json({ script });
-});
+}));
 
-// Dashboard stats
-app.get('/api/dashboard/stats', authMiddleware, async (req, res) => {
+app.get('/api/dashboard/stats', authMiddleware, asyncHandler(async (req, res) => {
   const supabase = getSupabaseAdmin();
   const branchFilter = req.user!.role === 'super_admin' ? null : req.user!.branchId;
 
-  let query = supabase.from('posts').select('status, platform, approval_status', { count: 'exact' });
+  let query = supabase.from('posts').select('status, platform, approval_status');
   if (branchFilter) query = query.eq('branch_id', branchFilter);
 
-  const { data: posts } = await query;
+  const { data: posts, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
 
   const stats = {
     scheduled: posts?.filter((p) => p.status === 'scheduled').length || 0,
@@ -240,9 +267,16 @@ app.get('/api/dashboard/stats', authMiddleware, async (req, res) => {
   };
 
   res.json(stats);
+}));
+
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof HttpError) {
+    return res.status(err.statusCode).json({ error: err.message });
+  }
+  console.error('[API Error]', err.message);
+  res.status(500).json({ error: err.message || 'Error interno del servidor' });
 });
 
-// Local dev server
 if (process.env.VERCEL !== '1') {
   app.listen(config.port, () => {
     console.log(`🍗 El Pollón API corriendo en http://localhost:${config.port}`);

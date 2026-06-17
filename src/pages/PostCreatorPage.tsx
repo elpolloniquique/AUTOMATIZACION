@@ -125,6 +125,7 @@ export default function PostCreatorPage() {
         token: session.access_token,
         body: JSON.stringify({
           template_slug: slugMap[watched.post_type] || 'oferta-familiar',
+          branch_id: branch.id,
           branch_name: branch.name,
           offer_title: watched.title,
           price: watched.price,

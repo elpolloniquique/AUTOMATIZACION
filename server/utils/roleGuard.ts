@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import type { UserRole } from '../types.js';
 
@@ -35,7 +36,19 @@ export function cronGuard(req: Request, res: Response, next: NextFunction) {
     return res.status(500).json({ error: 'CRON_SECRET no configurado en el servidor' });
   }
 
-  if (authHeader !== `Bearer ${cronSecret}`) {
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+
+  const expected = `Bearer ${cronSecret}`;
+
+  try {
+    const a = Buffer.from(authHeader);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
+      return res.status(401).json({ error: 'No autorizado' });
+    }
+  } catch {
     return res.status(401).json({ error: 'No autorizado' });
   }
 

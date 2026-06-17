@@ -13,7 +13,19 @@ export function ProtectedRoute({ children, roles }: { children: React.ReactNode;
   }
 
   if (!user) return <Navigate to="/login" replace />;
-  if (roles && profile && !roles.includes(profile.role)) {
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <p className="text-lg font-semibold">Perfil no configurado</p>
+          <p className="text-gray-500 mt-2">Tu cuenta no tiene perfil en el sistema. Contacta al administrador.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (roles && !roles.includes(profile.role)) {
     return <Navigate to="/" replace />;
   }
 

@@ -85,6 +85,7 @@ export default function SocialConfigPage() {
             platform,
             account_id: form.account_id,
             access_token: form.access_token,
+            branch_id: selectedBranch,
           }),
         }
       );

@@ -5,7 +5,19 @@ dotenv.config();
 
 const url = process.env.VITE_SUPABASE_URL?.replace(/\/$/, '')!;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const email = 'tutacanehuillca@gmail.com';
+const email = process.argv[2] || process.env.ADMIN_EMAIL;
+const password = process.argv[3] || process.env.ADMIN_PASSWORD;
+
+if (!url || !serviceKey) {
+  console.error('Faltan VITE_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en .env');
+  process.exit(1);
+}
+
+if (!email || !password) {
+  console.error('Uso: npm run setup:admin -- EMAIL CONTRASEÑA');
+  console.error('O define ADMIN_EMAIL y ADMIN_PASSWORD en .env');
+  process.exit(1);
+}
 
 const admin = createClient(url, serviceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
@@ -13,29 +25,28 @@ const admin = createClient(url, serviceKey, {
 
 async function main() {
   const { data: list } = await admin.auth.admin.listUsers();
-  const user = list?.users.find((u) => u.email?.toLowerCase() === email);
+  const user = list?.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
 
   if (!user) {
-    console.log('Creando usuario...');
     const { data, error } = await admin.auth.admin.createUser({
       email,
-      password: 'Pollon123',
+      password,
       email_confirm: true,
-      user_metadata: { full_name: 'Admin El Pollón', role: 'super_admin' },
+      user_metadata: { full_name: 'Admin El Pollón' },
     });
     if (error) throw error;
     await ensureProfile(data.user!.id);
-    console.log('✅ Usuario creado:', email, '/ Pollon123');
+    console.log('✅ Usuario creado:', email);
     return;
   }
 
   await admin.auth.admin.updateUserById(user.id, {
-    password: 'Pollon123',
+    password,
     email_confirm: true,
   });
 
   await ensureProfile(user.id);
-  console.log('✅ Usuario listo:', email, '/ Pollon123 / super_admin');
+  console.log('✅ Usuario listo como super_admin:', email);
 }
 
 async function ensureProfile(userId: string) {
@@ -49,14 +60,11 @@ async function ensureProfile(userId: string) {
       role: 'super_admin',
       branch_id: null,
     });
-    console.log('   Perfil creado');
   } else {
     await admin.from('profiles').update({
       role: 'super_admin',
       branch_id: null,
-      full_name: 'Admin El Pollón',
     }).eq('id', userId);
-    console.log('   Perfil actualizado a super_admin');
   }
 }
 

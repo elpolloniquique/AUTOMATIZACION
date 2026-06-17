@@ -42,7 +42,7 @@ export async function publishDuePosts(): Promise<PublishJobResult> {
     .eq('approval_status', 'approved')
     .lte('scheduled_at', now)
     .order('scheduled_at', { ascending: true })
-    .limit(50);
+    .limit(5);
 
   if (error) throw new Error(`Error buscando posts: ${error.message}`);
 

@@ -3,9 +3,11 @@ dist
 .env
 .env.local
 .env.*.local
-*.log
-.DS_Store
+.env.production
+.env.development
+*.pem
 .vercel
 playwright-report
 test-results
 .cache
+.supabase

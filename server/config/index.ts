@@ -35,5 +35,8 @@ export function validateConfig(): string[] {
   if (!config.supabase.url) warnings.push('VITE_SUPABASE_URL no configurado');
   if (!config.supabase.serviceRoleKey) warnings.push('SUPABASE_SERVICE_ROLE_KEY no configurado');
   if (!config.cronSecret) warnings.push('CRON_SECRET no configurado (requerido en producción)');
+  if (config.nodeEnv === 'production' && !process.env.APP_URL) {
+    warnings.push('APP_URL no configurado (CORS puede fallar)');
+  }
   return warnings;
 }
