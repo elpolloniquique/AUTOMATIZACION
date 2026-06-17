@@ -95,17 +95,21 @@ app.post('/api/ai/generate', authMiddleware, asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
+function optionalString() {
+  return z.union([z.string(), z.null()]).optional().transform((v) => v ?? undefined);
+}
+
 app.post('/api/images/generate', authMiddleware, asyncHandler(async (req, res) => {
   const schema = z.object({
     template_slug: z.string(),
     branch_name: z.string(),
     branch_id: z.string().uuid().optional(),
     offer_title: z.string().min(1, 'El título es requerido'),
-    price: z.string().optional(),
-    product_image_url: z.string().optional(),
-    logo_url: z.string().optional(),
-    cta: z.string().optional(),
-    brand_color: z.string().optional(),
+    price: optionalString(),
+    product_image_url: optionalString(),
+    logo_url: optionalString(),
+    cta: optionalString(),
+    brand_color: optionalString(),
     post_id: z.string().uuid().optional(),
   });
 

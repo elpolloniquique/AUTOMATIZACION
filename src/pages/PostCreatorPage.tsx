@@ -128,10 +128,10 @@ export default function PostCreatorPage() {
           branch_id: branch.id,
           branch_name: branch.name,
           offer_title: watched.title,
-          price: watched.price,
-          logo_url: branch.logo_url,
+          price: watched.price || undefined,
+          logo_url: branch.logo_url || undefined,
           cta: watched.cta || 'Pide ahora por WhatsApp',
-          brand_color: branch.brand_color,
+          brand_color: branch.brand_color || '#c50000',
         }),
       });
       setImageUrl(result.url);
