@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from '../utils/supabase.js';
 import { publishWithRetry as publishFacebook } from '../services/meta/facebookPublisher.js';
+import { appendPollonContact } from '../constants/pollonBrand.js';
 import { publishToInstagram } from '../services/meta/instagramPublisher.js';
 import { publishToTikTok } from '../services/tiktok/tiktokPublisher.js';
 import { publishToGoogleBusiness } from '../services/google-business/googleBusinessPublisher.js';
@@ -180,7 +181,7 @@ function buildCaption(post: PostRow): string {
   const parts = [post.caption || post.title];
   if (post.cta) parts.push(post.cta);
   if (post.hashtags?.length) parts.push(post.hashtags.map((h) => (h.startsWith('#') ? h : `#${h}`)).join(' '));
-  return parts.filter(Boolean).join('\n\n');
+  return appendPollonContact(parts.filter(Boolean).join('\n\n'));
 }
 
 // Ejecutar directamente: npm run cron:local

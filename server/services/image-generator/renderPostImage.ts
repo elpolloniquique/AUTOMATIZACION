@@ -5,6 +5,7 @@ import { chromium as playwrightChromium } from 'playwright-core';
 import sharp from 'sharp';
 import { getSupabaseAdmin } from '../../utils/supabase.js';
 import { config } from '../../config/index.js';
+import { pollonImageTemplateVars } from '../../constants/pollonBrand.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -49,8 +50,9 @@ export async function renderPostImage(params: RenderPostImageParams): Promise<st
     price: params.price || 'Consulta precios',
     productImageUrl: params.productImageUrl || '',
     logoUrl: params.logoUrl || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect fill="%23c50000" width="80" height="80"/><text x="40" y="50" text-anchor="middle" fill="white" font-size="24">EP</text></svg>',
-    cta: params.cta || 'Pide ahora por WhatsApp',
+    cta: params.cta || '📱 Haz tu pedido por WhatsApp',
     brandColor: params.brandColor || '#c50000',
+    ...pollonImageTemplateVars(),
   });
 
   const pngBuffer = await renderHtmlToPng(filledHtml);

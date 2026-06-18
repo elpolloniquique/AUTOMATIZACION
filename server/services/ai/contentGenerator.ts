@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { config } from '../../config/index.js';
 import { getSupabaseAdmin } from '../../utils/supabase.js';
+import { POLLON_BRAND, appendPollonContact } from '../../constants/pollonBrand.js';
 
 export type ContentType = 'facebook' | 'instagram' | 'tiktok' | 'google_business' | 'hashtags' | 'cta' | 'ab_variant';
 
@@ -17,10 +18,14 @@ export interface GenerateContentParams {
 }
 
 const POLLON_CONTEXT = `
-Eres un experto en marketing digital para pollerías peruanas/chilenas en el norte de Chile (Iquique, Alto Hospicio, Arica).
-Marca: El Pollón - Pollo a la brasa, comida peruana, delivery, combos familiares.
-Tono: cercano, apetitoso, con emojis moderados, en español latinoamericano.
-CTA habitual: "Pide ahora por WhatsApp".
+Eres un experto en marketing digital para pollerías peruanas/chilenas en el norte de Chile.
+Marca: El Pollón - Pollo a la brasa, comida peruana, delivery a domicilio, combos familiares.
+Ciudades con delivery: ${POLLON_BRAND.deliveryCities}.
+Horario: ${POLLON_BRAND.hours}.
+WhatsApp: ${POLLON_BRAND.whatsappUrl}
+Web para pedidos online: ${POLLON_BRAND.websiteUrl}
+Tono: cercano, apetitoso, profesional, con emojis moderados, en español latinoamericano.
+SIEMPRE incluye al final el bloque de contacto con WhatsApp, web, ciudades y horario.
 `;
 
 const PROMPTS: Record<ContentType, (p: GenerateContentParams) => string> = {
@@ -59,14 +64,14 @@ Variante A: enfoque emocional. Variante B: enfoque en oferta/precio.`,
 // Fallback templates cuando no hay OpenAI
 const FALLBACK_TEMPLATES: Record<string, string[]> = {
   oferta: [
-    '🔥 ¡OFERTA FAMILIAR en {branch}! Pollo a la brasa recién horneado para toda la familia. {price} ¡No te lo pierdas! 📲 Pide por WhatsApp.',
-    '🍗 Fin de semana = El Pollón. Combo familiar con el mejor pollo a la brasa de {city}. ¡Pide ya!',
+    '🔥 ¡OFERTA FAMILIAR en {branch}! Pollo a la brasa recién horneado para toda la familia. {price} ¡No te lo pierdas!',
+    '🍗 Fin de semana = El Pollón. Combo familiar con el mejor pollo a la brasa de {city}. ¡El sabor que tu familia merece!',
   ],
   combo: [
     '💑 Combo para dos en {branch}: pollo jugoso + papas doradas + ensalada. El sabor que compartes con quien más quieres. {price}',
   ],
   delivery: [
-    '🛵 Delivery rápido en {city}. Tu pollo a la brasa llega caliente a tu puerta. Pide por WhatsApp: ¡en minutos estás disfrutando!',
+    '🛵 Delivery rápido en {city}. Tu pollo a la brasa llega caliente a tu puerta. ¡Pide online o por WhatsApp!',
   ],
   promocion: [
     '🎉 ¡Promoción especial en {branch}! Solo por tiempo limitado. Pollo a la brasa con el sabor auténtico peruano que te encanta.',
@@ -75,18 +80,19 @@ const FALLBACK_TEMPLATES: Record<string, string[]> = {
     '⭐ Plato estrella: Pollo a la brasa El Pollón. Crujiente por fuera, jugoso por dentro. {price} en {branch}, {city}.',
   ],
   default: [
-    '🍗 El Pollón {branch} te espera con el mejor pollo a la brasa de {city}. ¡Visítanos o pide delivery! 📲',
+    '🍗 El Pollón {branch} te espera con el mejor pollo a la brasa de {city}. ¡Pide delivery o visita nuestra web!',
   ],
 };
 
 function applyFallback(params: GenerateContentParams): string {
   const templates = FALLBACK_TEMPLATES[params.postType] || FALLBACK_TEMPLATES.default;
   const template = templates[Math.floor(Math.random() * templates.length)];
-  return template
+  const body = template
     .replace(/{branch}/g, params.branchName)
     .replace(/{city}/g, params.city)
     .replace(/{price}/g, params.price || 'Consulta precios')
     .replace(/{product}/g, params.productName || 'pollo a la brasa');
+  return appendPollonContact(body);
 }
 
 export async function generateContent(params: GenerateContentParams): Promise<{ result: string; source: 'openai' | 'template' }> {
@@ -96,7 +102,7 @@ export async function generateContent(params: GenerateContentParams): Promise<{ 
     try {
       const result = await callOpenAI(prompt);
       await saveGeneration(params, prompt, result);
-      return { result, source: 'openai' };
+      return { result: appendPollonContact(result), source: 'openai' };
     } catch (err) {
       console.warn('[AI] OpenAI falló, usando plantilla:', err);
     }

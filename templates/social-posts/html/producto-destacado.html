@@ -4,39 +4,60 @@
 <meta charset="UTF-8">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { width: 1080px; height: 1080px; font-family: 'Segoe UI', Arial, sans-serif; }
-  .card {
-    width: 1080px; height: 1080px;
-    background: #1a1a1a;
-    display: flex; flex-direction: column;
-  }
-  .hero { flex: 1; background: linear-gradient(to bottom, transparent 60%, #1a1a1a), url('{{productImageUrl}}') center/cover; min-height: 600px; position: relative; }
-  .star { position: absolute; top: 40px; left: 40px; background: #f5a623; color: #1a1a1a; font-size: 28px; font-weight: 900; padding: 15px 30px; border-radius: 10px; }
-  .info { padding: 40px 50px; }
-  .title { color: #fff; font-size: 64px; font-weight: 900; line-height: 1.1; }
-  .price { color: {{brandColor}}; font-size: 72px; font-weight: 900; margin: 15px 0; }
-  .desc { color: #aaa; font-size: 28px; }
-  .bottom { display: flex; justify-content: space-between; align-items: center; padding: 30px 50px; background: {{brandColor}}; }
-  .cta { color: #fff; font-size: 32px; font-weight: 800; }
-  .branch { color: rgba(255,255,255,0.9); font-size: 24px; }
+  body { width: 1080px; height: 1080px; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; }
+  .card { width: 1080px; height: 1080px; background: #1a1a1a; display: flex; flex-direction: column; }
+  .hero { height: 480px; background: linear-gradient(to bottom, transparent 50%, #1a1a1a), linear-gradient(135deg, {{brandColor}}, #3a0000); position: relative; display: flex; align-items: flex-end; padding: 30px; }
+  {{#productImageUrl}}.hero { background: linear-gradient(to bottom, transparent 50%, #1a1a1a), url('{{productImageUrl}}') center/cover; }{{/productImageUrl}}
+  .star { position: absolute; top: 32px; left: 32px; background: linear-gradient(135deg, #f5a623, #ffcc00); color: #1a1a1a; font-size: 24px; font-weight: 900; padding: 12px 28px; border-radius: 10px; letter-spacing: 1px; }
+  .info { padding: 28px 44px 16px; flex: 1; }
+  .title { color: #fff; font-size: 56px; font-weight: 900; line-height: 1.08; }
+  .price { color: #ffcc00; font-size: 68px; font-weight: 900; margin: 12px 0; text-shadow: 2px 2px 0 #000; }
+  .desc { color: #bbb; font-size: 26px; font-weight: 500; }
+  .cta-row { display: flex; align-items: center; gap: 20px; margin-top: 16px; }
+  .cta { background: #25d366; color: #fff; font-size: 26px; font-weight: 800; padding: 14px 32px; border-radius: 50px; }
+  .branch { color: #888; font-size: 22px; }
+  .biz-footer { padding: 0 24px 22px; }
+  .biz-footer-inner { background: rgba(255,255,255,0.05); border: 2px solid rgba(245,166,35,0.3); border-radius: 18px; padding: 18px 22px; }
+  .biz-tags { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 14px; }
+  .biz-tag { background: rgba(255,255,255,0.08); color: #fff; font-size: 17px; font-weight: 600; padding: 7px 14px; border-radius: 30px; }
+  .biz-ctas { display: flex; gap: 12px; }
+  .biz-btn { flex: 1; text-align: center; font-size: 19px; font-weight: 800; padding: 14px 16px; border-radius: 50px; }
+  .biz-btn-wa { background: #25d366; color: #fff; }
+  .biz-btn-web { background: #fff; color: {{brandColor}}; }
+  .biz-meta { text-align: center; color: #f5a623; font-size: 16px; margin-top: 12px; font-weight: 600; }
+  .logo-wrap { position: absolute; top: 32px; right: 32px; }
+  .logo-wrap img { width: 72px; height: 72px; border-radius: 50%; background: #fff; padding: 6px; border: 3px solid #f5a623; }
 </style>
 </head>
 <body>
 <div class="card">
   <div class="hero">
     <div class="star">⭐ PRODUCTO DESTACADO</div>
+    <div class="logo-wrap"><img src="{{logoUrl}}" alt="Logo" onerror="this.parentElement.style.display='none'"></div>
   </div>
   <div class="info">
     <h1 class="title">{{offerTitle}}</h1>
     <div class="price">{{price}}</div>
-    <p class="desc">El mejor pollo a la brasa de la región</p>
-  </div>
-  <div class="bottom">
-    <div>
+    <p class="desc">El mejor pollo a la brasa de la región · {{tagline}}</p>
+    <div class="cta-row">
       <div class="cta">{{cta}}</div>
       <div class="branch">{{branchName}}</div>
     </div>
-    <img src="{{logoUrl}}" alt="Logo" style="width:80px;height:80px;border-radius:50%;background:#fff;padding:8px;" onerror="this.style.display='none'">
+  </div>
+  <div class="biz-footer">
+    <div class="biz-footer-inner">
+      <div class="biz-tags">
+        <span class="biz-tag">🍗 Pollo a la Brasa</span>
+        <span class="biz-tag">🚚 Delivery a Domicilio</span>
+        <span class="biz-tag">📍 {{deliveryCities}}</span>
+        <span class="biz-tag">⏰ {{hours}}</span>
+      </div>
+      <div class="biz-ctas">
+        <div class="biz-btn biz-btn-wa">📱 WhatsApp · {{whatsappPhone}}</div>
+        <div class="biz-btn biz-btn-web">🌐 {{websiteDisplay}}</div>
+      </div>
+      <div class="biz-meta">Haz tu pedido aquí: {{websiteUrl}}</div>
+    </div>
   </div>
 </div>
 </body>

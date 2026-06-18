@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SocialPreview } from '@/components/SocialPreview';
 import type { Branch, Platform, PostType } from '@/types';
 import { PLATFORM_LABELS, POST_TYPE_LABELS } from '@/types';
+import { POLLON_CONTACT } from '@/constants/pollonBrand';
 
 const postSchema = z.object({
   branch_id: z.string().uuid(),
@@ -130,7 +131,7 @@ export default function PostCreatorPage() {
           offer_title: watched.title,
           price: watched.price || undefined,
           logo_url: branch.logo_url || undefined,
-          cta: watched.cta || 'Pide ahora por WhatsApp',
+          cta: watched.cta || POLLON_CONTACT.defaultCta,
           brand_color: branch.brand_color || '#c50000',
         }),
       });
@@ -227,7 +228,7 @@ export default function PostCreatorPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div><Label>CTA</Label><Input {...register('cta')} placeholder="Pide por WhatsApp" /></div>
+              <div><Label>CTA</Label><Input {...register('cta')} placeholder={POLLON_CONTACT.defaultCta} /></div>
               <div><Label>Precio</Label><Input {...register('price')} placeholder="$19.990" /></div>
             </div>
 

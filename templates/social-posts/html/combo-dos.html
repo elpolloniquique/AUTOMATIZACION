@@ -4,41 +4,58 @@
 <meta charset="UTF-8">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { width: 1080px; height: 1080px; font-family: 'Segoe UI', Arial, sans-serif; }
-  .card {
-    width: 1080px; height: 1080px;
-    background: #fff;
-    display: grid; grid-template-rows: auto 1fr auto;
-  }
-  .header { background: {{brandColor}}; padding: 30px 50px; text-align: center; }
-  .header h2 { color: #f5a623; font-size: 36px; font-weight: 800; }
-  .header h1 { color: #fff; font-size: 56px; font-weight: 900; margin-top: 10px; }
-  .body { display: flex; align-items: center; justify-content: center; padding: 40px; background: linear-gradient(180deg, #fff 0%, #fff5f5 100%); }
-  .combo-box { background: #1a1a1a; border-radius: 30px; padding: 50px; text-align: center; max-width: 800px; border: 6px solid #f5a623; }
-  .combo-box h3 { color: #fff; font-size: 48px; margin-bottom: 20px; }
-  .combo-box .price { color: #f5a623; font-size: 80px; font-weight: 900; }
-  .combo-box p { color: #ccc; font-size: 28px; margin-top: 15px; }
-  .footer { background: #1a1a1a; padding: 30px; text-align: center; }
-  .cta { color: #25d366; font-size: 32px; font-weight: 800; }
-  .branch-tag { color: #fff; font-size: 24px; margin-top: 10px; opacity: 0.8; }
+  body { width: 1080px; height: 1080px; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; }
+  .card { width: 1080px; height: 1080px; background: #fff; display: flex; flex-direction: column; }
+  .header { background: linear-gradient(135deg, {{brandColor}}, #8b0000); padding: 28px 40px; text-align: center; }
+  .header h2 { color: #ffcc00; font-size: 30px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; }
+  .header h1 { color: #fff; font-size: 50px; font-weight: 900; margin-top: 8px; line-height: 1.1; }
+  .body { flex: 1; display: flex; align-items: center; justify-content: center; padding: 28px 36px; background: linear-gradient(180deg, #fff 0%, #fff8f8 100%); }
+  .combo-box { background: linear-gradient(145deg, #1a1a1a, #2a0a0a); border-radius: 28px; padding: 44px 48px; text-align: center; width: 100%; border: 5px solid #f5a623; box-shadow: 0 12px 40px rgba(0,0,0,0.2); }
+  .combo-box h3 { color: #f5a623; font-size: 28px; font-weight: 800; margin-bottom: 8px; letter-spacing: 2px; }
+  .combo-box .price { color: #ffcc00; font-size: 76px; font-weight: 900; text-shadow: 2px 2px 0 #000; }
+  .combo-box p { color: #ddd; font-size: 26px; margin-top: 14px; font-weight: 500; }
+  .combo-box .cta-inline { color: #25d366; font-size: 24px; font-weight: 800; margin-top: 18px; }
+  .biz-footer { padding: 0 24px 22px; background: #fff; }
+  .biz-footer-inner { background: #1a1a1a; border-radius: 18px; padding: 18px 22px; border: 2px solid rgba(245,166,35,0.3); }
+  .biz-tags { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 14px; }
+  .biz-tag { background: rgba(255,255,255,0.08); color: #fff; font-size: 17px; font-weight: 600; padding: 7px 14px; border-radius: 30px; }
+  .biz-ctas { display: flex; gap: 12px; }
+  .biz-btn { flex: 1; text-align: center; font-size: 19px; font-weight: 800; padding: 14px 16px; border-radius: 50px; }
+  .biz-btn-wa { background: #25d366; color: #fff; }
+  .biz-btn-web { background: #fff; color: {{brandColor}}; }
+  .biz-meta { text-align: center; color: #f5a623; font-size: 16px; margin-top: 12px; font-weight: 600; }
+  .branch-tag { color: rgba(255,255,255,0.7); font-size: 18px; text-align: center; margin-top: 10px; }
 </style>
 </head>
 <body>
 <div class="card">
   <div class="header">
-    <h2>💑 COMBO PARA DOS</h2>
+    <h2>💑 Combo para dos</h2>
     <h1>{{offerTitle}}</h1>
   </div>
   <div class="body">
     <div class="combo-box">
-      <h3>El Pollón</h3>
+      <h3>EL POLLÓN · {{branchName}}</h3>
       <div class="price">{{price}}</div>
-      <p>Pollo a la brasa + papas + ensalada</p>
+      <p>Pollo a la brasa + papas doradas + ensalada fresca</p>
+      <div class="cta-inline">{{cta}}</div>
     </div>
   </div>
-  <div class="footer">
-    <div class="cta">{{cta}}</div>
-    <div class="branch-tag">📍 {{branchName}}</div>
+  <div class="biz-footer">
+    <div class="biz-footer-inner">
+      <div class="biz-tags">
+        <span class="biz-tag">🍗 Pollo a la Brasa</span>
+        <span class="biz-tag">🚚 Delivery a Domicilio</span>
+        <span class="biz-tag">📍 {{deliveryCities}}</span>
+        <span class="biz-tag">⏰ {{hours}}</span>
+      </div>
+      <div class="biz-ctas">
+        <div class="biz-btn biz-btn-wa">📱 WhatsApp · {{whatsappPhone}}</div>
+        <div class="biz-btn biz-btn-web">🌐 {{websiteDisplay}}</div>
+      </div>
+      <div class="biz-meta">Pedido online con delivery · {{websiteUrl}}</div>
+      <div class="branch-tag">📍 {{branchName}}</div>
+    </div>
   </div>
 </div>
 </body>

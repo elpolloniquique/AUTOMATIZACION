@@ -4,24 +4,35 @@
 <meta charset="UTF-8">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { width: 1080px; height: 1080px; font-family: 'Segoe UI', Arial, sans-serif; }
+  body { width: 1080px; height: 1080px; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; }
   .card {
     width: 1080px; height: 1080px;
-    background: repeating-linear-gradient(45deg, {{brandColor}}, {{brandColor}} 20px, #a00000 20px, #a00000 40px);
-    display: flex; align-items: center; justify-content: center; padding: 30px;
+    background: repeating-linear-gradient(45deg, {{brandColor}}, {{brandColor}} 18px, #8b0000 18px, #8b0000 36px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px;
   }
   .inner {
-    width: 100%; height: 100%;
-    background: #1a1a1a; border-radius: 30px;
+    width: 100%; flex: 1;
+    background: linear-gradient(160deg, #1a1a1a 0%, #2a0505 100%);
+    border-radius: 28px;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    border: 8px solid #f5a623; padding: 50px; text-align: center;
+    border: 6px solid #f5a623; padding: 40px 44px 24px; text-align: center;
+    box-shadow: inset 0 0 60px rgba(245,166,35,0.08);
   }
-  .weekend { color: #f5a623; font-size: 48px; font-weight: 900; letter-spacing: 8px; text-transform: uppercase; margin-bottom: 20px; }
-  .title { color: #fff; font-size: 68px; font-weight: 900; line-height: 1.1; }
-  .price { color: #fff; background: {{brandColor}}; font-size: 80px; font-weight: 900; padding: 20px 60px; border-radius: 20px; margin: 30px 0; display: inline-block; }
-  .emoji-row { font-size: 60px; margin: 20px 0; }
-  .cta { background: #f5a623; color: #1a1a1a; font-size: 36px; font-weight: 900; padding: 25px 60px; border-radius: 60px; margin-top: 20px; }
-  .branch { color: #888; font-size: 26px; margin-top: 25px; }
+  .weekend { color: #ffcc00; font-size: 40px; font-weight: 900; letter-spacing: 6px; text-transform: uppercase; margin-bottom: 16px; }
+  .title { color: #fff; font-size: 58px; font-weight: 900; line-height: 1.08; max-width: 900px; }
+  .emoji-row { font-size: 52px; margin: 16px 0; letter-spacing: 12px; }
+  .price { color: #fff; background: linear-gradient(135deg, {{brandColor}}, #8b0000); font-size: 72px; font-weight: 900; padding: 18px 52px; border-radius: 16px; margin: 20px 0; display: inline-block; box-shadow: 0 6px 25px rgba(0,0,0,0.4); border: 3px solid #f5a623; }
+  .cta { background: linear-gradient(135deg, #f5a623, #ffcc00); color: #1a1a1a; font-size: 30px; font-weight: 900; padding: 20px 52px; border-radius: 60px; margin-top: 12px; box-shadow: 0 4px 20px rgba(245,166,35,0.4); }
+  .branch { color: #aaa; font-size: 22px; margin-top: 16px; font-weight: 600; }
+  .biz-footer { width: 100%; margin-top: 20px; }
+  .biz-footer-inner { background: rgba(0,0,0,0.5); border: 2px solid rgba(245,166,35,0.35); border-radius: 18px; padding: 18px 22px; }
+  .biz-tags { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 14px; }
+  .biz-tag { background: rgba(255,255,255,0.08); color: #fff; font-size: 17px; font-weight: 600; padding: 7px 14px; border-radius: 30px; }
+  .biz-ctas { display: flex; gap: 12px; }
+  .biz-btn { flex: 1; text-align: center; font-size: 19px; font-weight: 800; padding: 14px 16px; border-radius: 50px; }
+  .biz-btn-wa { background: #25d366; color: #fff; }
+  .biz-btn-web { background: #fff; color: {{brandColor}}; }
+  .biz-meta { text-align: center; color: #f5a623; font-size: 16px; margin-top: 12px; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -33,6 +44,21 @@
     <div class="price">{{price}}</div>
     <div class="cta">{{cta}}</div>
     <p class="branch">📍 {{branchName}} — El Pollón</p>
+    <div class="biz-footer">
+      <div class="biz-footer-inner">
+        <div class="biz-tags">
+          <span class="biz-tag">🍗 Pollo a la Brasa</span>
+          <span class="biz-tag">🚚 Delivery a Domicilio</span>
+          <span class="biz-tag">📍 {{deliveryCities}}</span>
+          <span class="biz-tag">⏰ {{hours}}</span>
+        </div>
+        <div class="biz-ctas">
+          <div class="biz-btn biz-btn-wa">📱 WhatsApp · {{whatsappPhone}}</div>
+          <div class="biz-btn biz-btn-web">🌐 {{websiteDisplay}}</div>
+        </div>
+        <div class="biz-meta">Haz tu pedido aquí: {{websiteUrl}}</div>
+      </div>
+    </div>
   </div>
 </div>
 </body>
