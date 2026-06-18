@@ -44,6 +44,8 @@ export default function PostCreatorPage() {
   const [imageMode, setImageMode] = useState<ImageGenerateMode>('gallery_auto');
   const [imagePrompt, setImagePrompt] = useState('');
   const [lastMatch, setLastMatch] = useState<ImageGenerateResult | null>(null);
+  const [openAiReady, setOpenAiReady] = useState<boolean | null>(null);
+  const [aiProvider, setAiProvider] = useState<string | null>(null);
 
   const { register, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm<PostForm>({
     resolver: zodResolver(postSchema),
@@ -55,6 +57,17 @@ export default function PostCreatorPage() {
   });
 
   const watched = watch();
+
+  useEffect(() => {
+    if (session?.access_token) {
+      apiFetch<{ ai_configured?: boolean; ai_provider?: string }>('/api/images/templates', { token: session.access_token })
+        .then((r) => {
+          setOpenAiReady(Boolean(r.ai_configured));
+          setAiProvider(r.ai_provider || null);
+        })
+        .catch(() => setOpenAiReady(false));
+    }
+  }, [session]);
 
   useEffect(() => {
     supabase.from('branches').select('*').eq('is_active', true).then(({ data }) => {
@@ -275,6 +288,19 @@ export default function PostCreatorPage() {
                   </div>
                 </label>
               </div>
+              {imageMode === 'gallery_prompt' && openAiReady === false && (
+                <div className="text-xs bg-amber-50 border border-amber-300 rounded-lg p-3 text-amber-900">
+                  <strong>IA avanzada no configurada.</strong> Agrega <code className="bg-amber-100 px-1 rounded">GEMINI_API_KEY</code> gratis en Vercel (recomendado) o <code className="bg-amber-100 px-1 rounded">OPENAI_API_KEY</code> de pago.
+                </div>
+              )}
+              {imageMode === 'gallery_prompt' && openAiReady === true && (
+                <div className="text-xs bg-blue-50 border border-blue-200 rounded-lg p-3 text-blue-800">
+                  <strong>IA avanzada activa</strong>
+                  {aiProvider === 'gemini' && ' (Google Gemini — gratis)'}
+                  {aiProvider === 'openai' && ' (OpenAI — de pago)'}
+                  . Editará tu foto manteniendo el plato natural según tu prompt.
+                </div>
+              )}
               {imageMode === 'gallery_prompt' && (
                 <div>
                   <Label>Prompt de edición</Label>
@@ -299,8 +325,14 @@ export default function PostCreatorPage() {
               <div className="text-xs bg-green-50 border border-green-200 rounded-lg p-3 text-green-800">
                 <strong>Foto usada:</strong> {lastMatch.galleryItem.title}
                 {lastMatch.matchReason && <span className="block text-green-600 mt-1">Coincidencia: {lastMatch.matchReason}</span>}
+                {lastMatch.aiSource === 'gemini' && (
+                  <span className="block text-green-700 mt-1 font-medium">✓ Generado con Google Gemini (gratis)</span>
+                )}
+                {lastMatch.aiSource === 'openai' && (
+                  <span className="block text-green-700 mt-1 font-medium">✓ Generado con OpenAI (de pago)</span>
+                )}
                 {lastMatch.aiSource === 'composer' && (
-                  <span className="block text-green-600 mt-1">Edición con compositor inteligente (gratis). Agrega OPENAI_API_KEY para IA avanzada.</span>
+                  <span className="block text-amber-700 mt-1">Compositor básico. Agrega GEMINI_API_KEY gratis para resultados fotorealistas.</span>
                 )}
               </div>
             )}

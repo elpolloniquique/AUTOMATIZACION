@@ -131,7 +131,7 @@ export interface ImageGenerateResult {
   galleryItem?: MediaGalleryItem;
   matchScore?: number;
   matchReason?: string;
-  aiSource?: 'openai' | 'composer' | 'template';
+  aiSource?: 'gemini' | 'openai' | 'composer' | 'template';
 }
 
 export interface DashboardStats {

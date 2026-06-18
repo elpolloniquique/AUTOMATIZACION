@@ -3,9 +3,11 @@ import sharp from 'sharp';
 import { config } from '../../config/index.js';
 
 interface SceneStyle {
-  top: string;
-  bottom: string;
-  accent: string;
+  wallTop: string;
+  wallBottom: string;
+  table: string;
+  tableEdge: string;
+  light: string;
   label: string;
 }
 
@@ -14,41 +16,41 @@ function detectScene(prompt: string): SceneStyle {
 
   if (/mesa|tabla|restaurante|comedor|madera/.test(p)) {
     return {
-      top: '#3d2817',
-      bottom: '#1a0f08',
-      accent: '#8b5a2b',
-      label: 'mesa de restaurante',
+      wallTop: '#2a1810',
+      wallBottom: '#1a0f08',
+      table: '#6b4423',
+      tableEdge: '#4a2f18',
+      light: '#ffcc88',
+      label: 'RESTAURANTE EL POLLÓN',
     };
   }
   if (/delivery|domicilio|envio|envío|puerta|casa/.test(p)) {
     return {
-      top: '#0d4d3d',
-      bottom: '#062a22',
-      accent: '#25d366',
-      label: 'delivery a domicilio',
+      wallTop: '#0a3d32',
+      wallBottom: '#051f1a',
+      table: '#1a5c4a',
+      tableEdge: '#0d3d32',
+      light: '#7dffb3',
+      label: 'DELIVERY A DOMICILIO',
     };
   }
   if (/familia|familiar|hogar|reunion/.test(p)) {
     return {
-      top: '#6b0f0f',
-      bottom: '#2a0505',
-      accent: '#f5a623',
-      label: 'ambiente familiar',
-    };
-  }
-  if (/promo|oferta|fiesta|celebr/.test(p)) {
-    return {
-      top: '#8b0000',
-      bottom: '#1a1a1a',
-      accent: '#ffcc00',
-      label: 'promoción especial',
+      wallTop: '#4a1010',
+      wallBottom: '#1a0505',
+      table: '#8b4513',
+      tableEdge: '#5c2e0a',
+      light: '#ffcc00',
+      label: 'OFERTA FAMILIAR',
     };
   }
   return {
-    top: '#2a2a2a',
-    bottom: '#0d0d0d',
-    accent: '#c50000',
-    label: 'presentación premium',
+    wallTop: '#1a1a1a',
+    wallBottom: '#0a0a0a',
+    table: '#3d2817',
+    tableEdge: '#2a1a0f',
+    light: '#f5a623',
+    label: 'EL POLLÓN',
   };
 }
 
@@ -61,25 +63,48 @@ async function downloadImage(url: string): Promise<Buffer> {
   return Buffer.from(data);
 }
 
+async function prepareFoodImage(photo: Buffer): Promise<{ buffer: Buffer; width: number; height: number }> {
+  let processed = sharp(photo).rotate();
+
+  try {
+    processed = sharp(await processed.trim({ threshold: 18 }).toBuffer());
+  } catch {
+    // trim puede fallar si no hay bordes uniformes
+  }
+
+  const buffer = await processed
+    .resize(820, 620, { fit: 'inside', withoutEnlargement: true })
+    .png()
+    .toBuffer();
+
+  const meta = await sharp(buffer).metadata();
+  return { buffer, width: meta.width || 820, height: meta.height || 620 };
+}
+
 function buildSceneSvg(width: number, height: number, scene: SceneStyle): Buffer {
-  const tableY = height * 0.72;
+  const tableY = height * 0.58;
   const svg = `
     <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" style="stop-color:${scene.top}"/>
-          <stop offset="100%" style="stop-color:${scene.bottom}"/>
+        <linearGradient id="wall" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="${scene.wallTop}"/>
+          <stop offset="100%" stop-color="${scene.wallBottom}"/>
         </linearGradient>
-        <radialGradient id="spot" cx="50%" cy="40%" r="60%">
-          <stop offset="0%" style="stop-color:${scene.accent};stop-opacity:0.25"/>
-          <stop offset="100%" style="stop-color:${scene.bottom};stop-opacity:0"/>
+        <linearGradient id="table" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="${scene.table}"/>
+          <stop offset="100%" stop-color="${scene.tableEdge}"/>
+        </linearGradient>
+        <radialGradient id="light" cx="50%" cy="25%" r="55%">
+          <stop offset="0%" stop-color="${scene.light}" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="${scene.wallBottom}" stop-opacity="0"/>
         </radialGradient>
+        <filter id="blur"><feGaussianBlur stdDeviation="2"/></filter>
       </defs>
-      <rect width="100%" height="100%" fill="url(#bg)"/>
-      <rect width="100%" height="100%" fill="url(#spot)"/>
-      <ellipse cx="${width / 2}" cy="${tableY}" rx="${width * 0.42}" ry="${height * 0.08}" fill="#000" opacity="0.35"/>
-      <rect x="0" y="${tableY - 20}" width="${width}" height="${height - tableY + 40}" fill="${scene.accent}" opacity="0.15"/>
-      <rect x="0" y="${height - 8}" width="${width}" height="8" fill="${scene.accent}" opacity="0.6"/>
+      <rect width="100%" height="100%" fill="url(#wall)"/>
+      <rect width="100%" height="100%" fill="url(#light)"/>
+      <rect x="0" y="${tableY}" width="${width}" height="${height - tableY}" fill="url(#table)"/>
+      <rect x="0" y="${tableY}" width="${width}" height="6" fill="${scene.table}" opacity="0.6"/>
+      <ellipse cx="${width / 2}" cy="${tableY + 8}" rx="${width * 0.38}" ry="18" fill="#000" opacity="0.25" filter="url(#blur)"/>
     </svg>
   `;
   return Buffer.from(svg);
@@ -93,58 +118,87 @@ export interface ComposeOptions {
   brandColor?: string;
 }
 
+export interface BrandOverlayOptions {
+  title?: string;
+  price?: string;
+  brandColor?: string;
+  sceneLabel?: string;
+}
+
+export async function addBrandOverlay(imageBuffer: Buffer, options: BrandOverlayOptions): Promise<Buffer> {
+  const meta = await sharp(imageBuffer).metadata();
+  const size = meta.width || 1080;
+  const brandColor = options.brandColor || '#c50000';
+  const title = escapeXml((options.title || '').slice(0, 55));
+  const price = escapeXml(options.price || '');
+  const label = escapeXml(options.sceneLabel || 'EL POLLÓN');
+
+  const overlaySvg = Buffer.from(`
+    <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="bar" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="${brandColor}"/>
+          <stop offset="100%" stop-color="#8b0000"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="${size}" height="100" fill="url(#bar)" opacity="0.95"/>
+      <text x="36" y="42" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="26" font-weight="800">EL POLLÓN</text>
+      <text x="36" y="72" fill="#ffcc00" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="700">${label}</text>
+      ${title ? `<text x="36" y="${size - 120}" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="34" font-weight="900">${title}</text>` : ''}
+      ${price ? `<text x="36" y="${size - 70}" fill="#ffcc00" font-family="Arial,Helvetica,sans-serif" font-size="44" font-weight="900">${price}</text>` : ''}
+      <rect x="36" y="${size - 52}" width="400" height="34" rx="17" fill="#25d366"/>
+      <text x="52" y="${size - 28}" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="800">WhatsApp +56 9 8692 5310 · el-pollon.cl</text>
+    </svg>
+  `);
+
+  return sharp(imageBuffer)
+    .composite([{ input: overlaySvg, top: 0, left: 0 }])
+    .png({ quality: 92 })
+    .toBuffer();
+}
+
 export async function composeGalleryImage(options: ComposeOptions): Promise<Buffer> {
   const size = 1080;
   const scene = detectScene(options.prompt);
   const photo = await downloadImage(options.photoUrl);
+  const { buffer: food, width: foodW, height: foodH } = await prepareFoodImage(photo);
 
-  const food = await sharp(photo)
-    .resize(780, 580, { fit: 'inside', withoutEnlargement: true })
-    .png()
-    .toBuffer();
-
-  const foodMeta = await sharp(food).metadata();
-  const foodW = foodMeta.width || 780;
-  const foodH = foodMeta.height || 580;
-
+  const shadowW = foodW + 60;
+  const shadowH = foodH + 50;
   const shadowSvg = Buffer.from(`
-    <svg width="${foodW + 40}" height="${foodH + 40}">
-      <ellipse cx="${(foodW + 40) / 2}" cy="${foodH + 25}" rx="${foodW * 0.45}" ry="28" fill="black" opacity="0.4"/>
+    <svg width="${shadowW}" height="${shadowH}">
+      <ellipse cx="${shadowW / 2}" cy="${shadowH - 15}" rx="${foodW * 0.42}" ry="22" fill="black" opacity="0.45"/>
     </svg>
   `);
 
-  const foodWithShadow = await sharp(shadowSvg)
-    .composite([{ input: food, top: 10, left: 20 }])
+  const foodWithShadow = await sharp({
+    create: { width: shadowW, height: shadowH, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  })
+    .composite([
+      { input: shadowSvg, top: 0, left: 0 },
+      { input: food, top: 0, left: 30 },
+    ])
     .png()
     .toBuffer();
 
   const sceneBg = buildSceneSvg(size, size, scene);
-  const topOffset = Math.round(size * 0.22);
-  const leftOffset = Math.round((size - foodW - 40) / 2);
+  const tableY = Math.round(size * 0.58);
+  const topOffset = tableY - foodH - 10;
+  const leftOffset = Math.round((size - shadowW) / 2);
 
-  const brandColor = options.brandColor || '#c50000';
-  const title = (options.title || '').slice(0, 60);
-  const price = options.price || '';
-
-  const overlaySvg = Buffer.from(`
-    <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
-      <rect x="0" y="0" width="${size}" height="120" fill="${brandColor}" opacity="0.92"/>
-      <text x="40" y="52" fill="#fff" font-family="Arial,sans-serif" font-size="28" font-weight="800">EL POLLÓN</text>
-      <text x="40" y="88" fill="#ffcc00" font-family="Arial,sans-serif" font-size="22" font-weight="700">${scene.label.toUpperCase()}</text>
-      ${title ? `<text x="40" y="${size - 130}" fill="#fff" font-family="Arial,sans-serif" font-size="36" font-weight="900">${escapeXml(title)}</text>` : ''}
-      ${price ? `<text x="40" y="${size - 80}" fill="#ffcc00" font-family="Arial,sans-serif" font-size="48" font-weight="900">${escapeXml(price)}</text>` : ''}
-      <rect x="40" y="${size - 55}" width="420" height="36" rx="18" fill="#25d366"/>
-      <text x="60" y="${size - 30}" fill="#fff" font-family="Arial,sans-serif" font-size="18" font-weight="800">📱 WhatsApp · www.el-pollon.cl</text>
-    </svg>
-  `);
-
-  return sharp(sceneBg)
+  const base = await sharp(sceneBg)
     .composite([
-      { input: foodWithShadow, top: topOffset, left: leftOffset },
-      { input: overlaySvg, top: 0, left: 0 },
+      { input: foodWithShadow, top: Math.max(120, topOffset), left: Math.max(0, leftOffset) },
     ])
-    .png({ quality: 92 })
+    .png()
     .toBuffer();
+
+  return addBrandOverlay(base, {
+    title: options.title,
+    price: options.price,
+    brandColor: options.brandColor,
+    sceneLabel: scene.label,
+  });
 }
 
 function escapeXml(s: string): string {

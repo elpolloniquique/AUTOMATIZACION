@@ -21,6 +21,9 @@ export const config = {
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',
   },
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || '',
+  },
   tiktok: {
     clientKey: process.env.TIKTOK_CLIENT_KEY || '',
     clientSecret: process.env.TIKTOK_CLIENT_SECRET || '',
@@ -35,6 +38,9 @@ export function validateConfig(): string[] {
   const warnings: string[] = [];
   if (!config.supabase.url) warnings.push('VITE_SUPABASE_URL no configurado');
   if (!config.supabase.serviceRoleKey) warnings.push('SUPABASE_SERVICE_ROLE_KEY no configurado');
+  if (!config.openai.apiKey && !config.gemini.apiKey) {
+    warnings.push('GEMINI_API_KEY u OPENAI_API_KEY no configurado (galería+prompt usará compositor básico)');
+  }
   if (!config.cronSecret) warnings.push('CRON_SECRET no configurado (requerido en producción)');
   if (config.nodeEnv === 'production' && !process.env.APP_URL) {
     warnings.push('APP_URL no configurado (CORS puede fallar)');

@@ -5,7 +5,6 @@ import { config } from '../../config/index.js';
 import { matchBestGalleryItem, type GalleryItem, type MatchInput } from './galleryMatcher.js';
 import { renderPostImage } from '../image-generator/renderPostImage.js';
 import { editGalleryImageWithAi } from './galleryAiEdit.js';
-import { composeGalleryImage, uploadComposedImage } from './galleryImageComposer.js';
 
 export type ImageGenerateMode = 'template' | 'gallery_auto' | 'gallery_prompt';
 
@@ -31,7 +30,7 @@ export interface GenerateFromGalleryResult {
   galleryItem?: GalleryItem;
   matchScore?: number;
   matchReason?: string;
-  aiSource?: 'openai' | 'composer' | 'template';
+  aiSource?: 'gemini' | 'openai' | 'composer' | 'template';
 }
 
 export async function fetchGalleryItems(branchId?: string): Promise<GalleryItem[]> {
@@ -105,42 +104,24 @@ export async function generatePostImage(params: GenerateFromGalleryParams): Prom
     };
   }
 
-  // gallery_prompt
+  // gallery_prompt — IA avanzada (Gemini gratis u OpenAI de pago) o compositor
   const prompt = params.imagePrompt?.trim() || `Presentación profesional de ${params.offerTitle}`;
 
-  if (config.openai.apiKey) {
-    const ai = await editGalleryImageWithAi({
-      photoUrl: match.item.public_url,
-      prompt,
-      title: params.offerTitle,
-      price: params.price,
-      brandColor: params.brandColor,
-    });
-    return {
-      url: ai.url,
-      mode: 'gallery_prompt',
-      galleryItem: match.item,
-      matchScore: match.score,
-      matchReason: match.reason,
-      aiSource: ai.source,
-    };
-  }
-
-  const buffer = await composeGalleryImage({
+  const ai = await editGalleryImageWithAi({
     photoUrl: match.item.public_url,
     prompt,
     title: params.offerTitle,
     price: params.price,
     brandColor: params.brandColor,
   });
-  const url = await uploadComposedImage(buffer, params.postId);
+
   return {
-    url,
+    url: ai.url,
     mode: 'gallery_prompt',
     galleryItem: match.item,
     matchScore: match.score,
     matchReason: match.reason,
-    aiSource: 'composer',
+    aiSource: ai.source,
   };
 }
 
