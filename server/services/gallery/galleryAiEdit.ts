@@ -29,16 +29,64 @@ export function isValidGeminiKey(key: string): boolean {
   return false;
 }
 
+/** Modelos con generación/edición de imagen (GA en Google AI Studio, 2026). */
 const GEMINI_IMAGE_MODELS = [
   'gemini-2.5-flash-image',
-  'gemini-2.0-flash-preview-image-generation',
+  'gemini-3.1-flash-image',
 ];
+
+interface ParsedGeminiError {
+  status?: number;
+  message: string;
+  nonRetryable: boolean;
+}
+
+function parseGeminiApiError(err: unknown): ParsedGeminiError {
+  const fallback = err instanceof Error ? err.message : String(err);
+
+  if (err && typeof err === 'object' && 'status' in err) {
+    const status = Number((err as { status: number }).status);
+    const message = formatGeminiErrorForUser(status, fallback);
+    return {
+      status,
+      message,
+      nonRetryable: status === 401 || status === 403 || status === 429,
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(fallback) as { error?: { code?: number; message?: string } };
+    const status = parsed.error?.code;
+    const raw = parsed.error?.message ?? fallback;
+    return {
+      status,
+      message: formatGeminiErrorForUser(status, raw),
+      nonRetryable: status === 401 || status === 403 || status === 429,
+    };
+  } catch {
+    return { message: fallback.slice(0, 200), nonRetryable: false };
+  }
+}
+
+function formatGeminiErrorForUser(status: number | undefined, raw: string): string {
+  if (status === 429) {
+    return 'Cuota gratuita de Gemini agotada. Espera unas horas o revisa límites en aistudio.google.com → Usage';
+  }
+  if (status === 404) {
+    return 'Modelo de imagen no disponible con tu clave. Verifica GEMINI_API_KEY en aistudio.google.com';
+  }
+  if (status === 403 || status === 401) {
+    return 'Clave Gemini sin permiso. Genera una nueva en aistudio.google.com/app/apikey';
+  }
+  return raw.replace(/\s+/g, ' ').slice(0, 180);
+}
 
 export async function editGalleryImageWithAi(options: AiEditOptions): Promise<AiEditResult> {
   const errors: string[] = [];
+  const geminiValid = Boolean(config.gemini.apiKey?.trim() && isValidGeminiKey(config.gemini.apiKey));
 
   if (config.gemini.apiKey) {
-    if (!isValidGeminiKey(config.gemini.apiKey)) {
+    if (!geminiValid) {
       errors.push(
         'GEMINI_API_KEY inválida: cópiala desde aistudio.google.com (formato AIzaSy... o AQ....)'
       );
@@ -47,20 +95,22 @@ export async function editGalleryImageWithAi(options: AiEditOptions): Promise<Ai
         const url = await tryGeminiEdit(options);
         return { url, source: 'gemini' };
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        errors.push(`Gemini: ${msg}`);
-        console.warn('[Gallery AI] Gemini falló:', msg);
+        const { message } = parseGeminiApiError(err);
+        errors.push(message);
+        console.warn('[Gallery AI] Gemini falló:', message);
       }
     }
   }
 
-  if (config.openai.apiKey?.startsWith('sk-')) {
+  // Si Gemini está configurado, no intentar OpenAI (evita errores de billing confusos)
+  if (!geminiValid && config.openai.apiKey?.startsWith('sk-')) {
     try {
       const url = await tryOpenAiEdit(options);
       return { url, source: 'openai' };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      errors.push(`OpenAI: ${msg}`);
+      const short = msg.includes('billing') ? 'OpenAI sin crédito disponible' : msg.slice(0, 180);
+      errors.push(short);
       console.warn('[Gallery AI] OpenAI falló:', msg);
     }
   }
@@ -71,7 +121,7 @@ export async function editGalleryImageWithAi(options: AiEditOptions): Promise<Ai
     url,
     source: 'composer',
     warning: errors.length
-      ? `IA no disponible (${errors.join(' | ')}). Se usó compositor básico.`
+      ? `${errors[0]}. Se usó compositor básico (sin IA).`
       : 'Sin API de IA configurada. Se usó compositor básico.',
   };
 }
@@ -169,7 +219,8 @@ async function tryGeminiEdit(options: AiEditOptions): Promise<string> {
           ],
         }],
         config: {
-          responseModalities: [Modality.TEXT, Modality.IMAGE],
+          responseModalities: [Modality.IMAGE],
+          imageConfig: { aspectRatio: '1:1' },
         },
       });
 
@@ -180,15 +231,17 @@ async function tryGeminiEdit(options: AiEditOptions): Promise<string> {
       if (!imageB64) {
         const textPart = parts.find((p) => p.text)?.text;
         lastError = textPart
-          ? `${model}: ${textPart.slice(0, 250)}`
-          : `${model}: sin imagen en respuesta`;
+          ? textPart.slice(0, 250)
+          : 'Gemini no devolvió imagen. Intenta un prompt más corto.';
         continue;
       }
 
       return await finalizeGeminiImage(imageB64, options);
     } catch (err) {
-      lastError = err instanceof Error ? err.message : String(err);
+      const parsed = parseGeminiApiError(err);
+      lastError = parsed.message;
       console.warn(`[Gemini SDK] ${model}:`, lastError);
+      if (parsed.nonRetryable) throw new Error(parsed.message);
     }
   }
 

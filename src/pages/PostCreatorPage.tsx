@@ -348,7 +348,7 @@ export default function PostCreatorPage() {
                 )}
                 {lastMatch.aiSource === 'composer' && (
                   <span className="block text-amber-700 mt-1">
-                    {lastMatch.aiWarning || 'Compositor básico. Configura GEMINI_API_KEY válida (AIzaSy...) en Vercel.'}
+                    {lastMatch.aiWarning || 'Compositor básico. Configura GEMINI_API_KEY válida (AIzaSy... o AQ....) en Vercel.'}
                   </span>
                 )}
               </div>
