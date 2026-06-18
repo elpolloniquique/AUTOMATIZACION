@@ -8,7 +8,7 @@ import { asyncHandler } from './utils/asyncHandler.js';
 import { assertBranchAccess, getPostBranchId, HttpError } from './utils/branchAccess.js';
 import { publishDuePosts, publishSinglePost } from './jobs/publishDuePosts.js';
 import { generateContent } from './services/ai/contentGenerator.js';
-import { AVAILABLE_TEMPLATES } from './services/image-generator/renderPostImage.js';
+import { AVAILABLE_TEMPLATES, listHtmlTemplateSlugs } from './services/image-generator/renderPostImage.js';
 import { generatePostImage, fetchGalleryItems, importGalleryFromUrl } from './services/gallery/galleryService.js';
 import { matchTopGalleryItems } from './services/gallery/galleryMatcher.js';
 import { isAdvancedAiConfigured, getActiveAiProvider, getAiConfigStatus } from './services/gallery/galleryAiEdit.js';
@@ -156,6 +156,11 @@ app.get('/api/images/templates', authMiddleware, (_req, res) => {
     ...aiStatus,
   });
 });
+
+app.get('/api/templates/html-slugs', authMiddleware, asyncHandler(async (_req, res) => {
+  const slugs = await listHtmlTemplateSlugs();
+  res.json({ slugs });
+}));
 
 app.get('/api/gallery/match', authMiddleware, asyncHandler(async (req, res) => {
   const branchId = req.query.branch_id as string | undefined;

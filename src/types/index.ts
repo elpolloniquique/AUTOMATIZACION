@@ -64,9 +64,11 @@ export interface PostTemplate {
   type: PostType;
   platform: string;
   html_template: string | null;
+  html_content: string | null;
   default_caption: string | null;
   is_active: boolean;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Post {

@@ -63,6 +63,24 @@ export async function renderPostImage(params: RenderPostImageParams): Promise<st
 }
 
 async function loadTemplate(slug: string): Promise<string> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data } = await supabase
+      .from('post_templates')
+      .select('html_content')
+      .eq('html_template', slug)
+      .eq('is_active', true)
+      .not('html_content', 'is', null)
+      .limit(1)
+      .maybeSingle();
+
+    if (data?.html_content?.trim()) {
+      return data.html_content;
+    }
+  } catch {
+    // fallback a archivos HTML
+  }
+
   const templatesDir = await getTemplatesDir();
   const templatePath = join(templatesDir, `${slug}.html`);
   try {
@@ -176,3 +194,14 @@ export const AVAILABLE_TEMPLATES = [
   { slug: 'producto-destacado', name: 'Producto Destacado', type: 'producto_destacado' },
   { slug: 'promo-fin-semana', name: 'Promoción Fin de Semana', type: 'promocion' },
 ];
+
+export async function listHtmlTemplateSlugs(): Promise<string[]> {
+  try {
+    const templatesDir = await getTemplatesDir();
+    const { readdir } = await import('fs/promises');
+    const files = await readdir(templatesDir);
+    return files.filter((f) => f.endsWith('.html')).map((f) => f.replace('.html', ''));
+  } catch {
+    return AVAILABLE_TEMPLATES.map((t) => t.slug);
+  }
+}
