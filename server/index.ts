@@ -8,7 +8,9 @@ import { asyncHandler } from './utils/asyncHandler.js';
 import { assertBranchAccess, getPostBranchId, HttpError } from './utils/branchAccess.js';
 import { publishDuePosts, publishSinglePost } from './jobs/publishDuePosts.js';
 import { generateContent } from './services/ai/contentGenerator.js';
-import { renderPostImage, AVAILABLE_TEMPLATES } from './services/image-generator/renderPostImage.js';
+import { AVAILABLE_TEMPLATES } from './services/image-generator/renderPostImage.js';
+import { generatePostImage, fetchGalleryItems, importGalleryFromUrl } from './services/gallery/galleryService.js';
+import { matchTopGalleryItems } from './services/gallery/galleryMatcher.js';
 import { testFacebookConnection } from './services/meta/facebookPublisher.js';
 import { testInstagramConnection } from './services/meta/instagramPublisher.js';
 import { testGoogleBusinessConnection } from './services/google-business/googleBusinessPublisher.js';
@@ -101,10 +103,14 @@ function optionalString() {
 
 app.post('/api/images/generate', authMiddleware, asyncHandler(async (req, res) => {
   const schema = z.object({
+    mode: z.enum(['template', 'gallery_auto', 'gallery_prompt']).default('gallery_auto'),
     template_slug: z.string(),
     branch_name: z.string(),
     branch_id: z.string().uuid().optional(),
     offer_title: z.string().min(1, 'El título es requerido'),
+    caption: optionalString(),
+    post_type: optionalString(),
+    image_prompt: optionalString(),
     price: optionalString(),
     product_image_url: optionalString(),
     logo_url: optionalString(),
@@ -120,23 +126,66 @@ app.post('/api/images/generate', authMiddleware, asyncHandler(async (req, res) =
     assertBranchAccess(req.user!, parsed.data.branch_id);
   }
 
-  const url = await renderPostImage({
+  const result = await generatePostImage({
+    mode: parsed.data.mode,
     templateSlug: parsed.data.template_slug,
     branchName: parsed.data.branch_name,
+    branchId: parsed.data.branch_id,
     offerTitle: parsed.data.offer_title,
+    caption: parsed.data.caption,
+    postType: parsed.data.post_type,
+    imagePrompt: parsed.data.image_prompt,
     price: parsed.data.price,
-    productImageUrl: parsed.data.product_image_url || undefined,
-    logoUrl: parsed.data.logo_url || undefined,
+    logoUrl: parsed.data.logo_url,
     cta: parsed.data.cta,
-    brandColor: parsed.data.brand_color || undefined,
+    brandColor: parsed.data.brand_color,
     postId: parsed.data.post_id,
   });
-  res.json({ url });
+  res.json(result);
 }));
 
 app.get('/api/images/templates', authMiddleware, (_req, res) => {
   res.json(AVAILABLE_TEMPLATES);
 });
+
+app.get('/api/gallery/match', authMiddleware, asyncHandler(async (req, res) => {
+  const branchId = req.query.branch_id as string | undefined;
+  const title = (req.query.title as string) || '';
+  const caption = (req.query.caption as string) || '';
+  const postType = (req.query.post_type as string) || '';
+
+  if (branchId) assertBranchAccess(req.user!, branchId);
+
+  const items = await fetchGalleryItems(branchId);
+  const matches = matchTopGalleryItems(items, { title, caption, postType, branchId }, 5);
+  res.json({ matches, total: items.length });
+}));
+
+app.post('/api/gallery/import-url', authMiddleware, asyncHandler(async (req, res) => {
+  const schema = z.object({
+    url: z.string().url(),
+    title: z.string().min(2),
+    description: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    dish_type: z.string().optional(),
+    branch_id: z.string().uuid().optional(),
+  });
+
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: zodErrorMessage(parsed) });
+
+  if (parsed.data.branch_id) assertBranchAccess(req.user!, parsed.data.branch_id);
+
+  const item = await importGalleryFromUrl(parsed.data.url, {
+    title: parsed.data.title,
+    description: parsed.data.description,
+    tags: parsed.data.tags,
+    dish_type: parsed.data.dish_type,
+    branch_id: parsed.data.branch_id,
+    created_by: req.user!.id,
+  });
+  res.json(item);
+}));
 
 app.post('/api/social/test', authMiddleware, roleGuard('super_admin', 'admin_sucursal'), asyncHandler(async (req, res) => {
   const schema = z.object({

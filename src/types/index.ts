@@ -108,6 +108,32 @@ export interface PostLog {
   created_at: string;
 }
 
+export type ImageGenerateMode = 'template' | 'gallery_auto' | 'gallery_prompt';
+
+export interface MediaGalleryItem {
+  id: string;
+  branch_id: string | null;
+  title: string;
+  description: string | null;
+  tags: string[] | null;
+  dish_type: string | null;
+  file_path: string;
+  public_url: string;
+  source: 'upload' | 'url';
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface ImageGenerateResult {
+  url: string;
+  mode: ImageGenerateMode;
+  galleryItem?: MediaGalleryItem;
+  matchScore?: number;
+  matchReason?: string;
+  aiSource?: 'openai' | 'composer' | 'template';
+}
+
 export interface DashboardStats {
   scheduled: number;
   published: number;

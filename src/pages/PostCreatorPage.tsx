@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SocialPreview } from '@/components/SocialPreview';
-import type { Branch, Platform, PostType } from '@/types';
+import type { Branch, Platform, PostType, ImageGenerateMode, ImageGenerateResult } from '@/types';
 import { PLATFORM_LABELS, POST_TYPE_LABELS } from '@/types';
 import { POLLON_CONTACT } from '@/constants/pollonBrand';
 
@@ -41,6 +41,9 @@ export default function PostCreatorPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [imgLoading, setImgLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [imageMode, setImageMode] = useState<ImageGenerateMode>('gallery_auto');
+  const [imagePrompt, setImagePrompt] = useState('');
+  const [lastMatch, setLastMatch] = useState<ImageGenerateResult | null>(null);
 
   const { register, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm<PostForm>({
     resolver: zodResolver(postSchema),
@@ -121,14 +124,18 @@ export default function PostCreatorPage() {
         oferta: 'oferta-familiar', combo: 'combo-dos', delivery: 'delivery',
         producto_destacado: 'producto-destacado', promocion: 'promo-fin-semana',
       };
-      const result = await apiFetch<{ url: string }>('/api/images/generate', {
+      const result = await apiFetch<ImageGenerateResult>('/api/images/generate', {
         method: 'POST',
         token: session.access_token,
         body: JSON.stringify({
+          mode: imageMode,
           template_slug: slugMap[watched.post_type] || 'oferta-familiar',
           branch_id: branch.id,
           branch_name: branch.name,
           offer_title: watched.title,
+          caption: watched.caption || undefined,
+          post_type: watched.post_type,
+          image_prompt: imageMode === 'gallery_prompt' ? imagePrompt : undefined,
           price: watched.price || undefined,
           logo_url: branch.logo_url || undefined,
           cta: watched.cta || POLLON_CONTACT.defaultCta,
@@ -136,6 +143,7 @@ export default function PostCreatorPage() {
         }),
       });
       setImageUrl(result.url);
+      setLastMatch(result);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error generando imagen. ¿Playwright instalado?');
     } finally {
@@ -242,12 +250,60 @@ export default function PostCreatorPage() {
               <Input type="datetime-local" {...register('scheduled_at')} />
             </div>
 
+            <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
+              <Label className="font-semibold">Generación de imagen</Label>
+              <div className="space-y-2">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input type="radio" name="imageMode" checked={imageMode === 'gallery_auto'} onChange={() => setImageMode('gallery_auto')} className="mt-1" />
+                  <div>
+                    <span className="text-sm font-medium">Galería automática (recomendado)</span>
+                    <p className="text-xs text-gray-500">Busca en tu galería la foto que más coincide con el título y texto</p>
+                  </div>
+                </label>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input type="radio" name="imageMode" checked={imageMode === 'gallery_prompt'} onChange={() => setImageMode('gallery_prompt')} className="mt-1" />
+                  <div>
+                    <span className="text-sm font-medium">Galería + prompt creativo</span>
+                    <p className="text-xs text-gray-500">Usa foto de galería y la edita según tu instrucción (ej: sobre una mesa)</p>
+                  </div>
+                </label>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input type="radio" name="imageMode" checked={imageMode === 'template'} onChange={() => setImageMode('template')} className="mt-1" />
+                  <div>
+                    <span className="text-sm font-medium">Solo plantilla HTML</span>
+                    <p className="text-xs text-gray-500">Diseño gráfico sin foto real de galería</p>
+                  </div>
+                </label>
+              </div>
+              {imageMode === 'gallery_prompt' && (
+                <div>
+                  <Label>Prompt de edición</Label>
+                  <textarea
+                    className="w-full border rounded-md p-2 text-sm min-h-[80px] mt-1"
+                    value={imagePrompt}
+                    onChange={(e) => setImagePrompt(e.target.value)}
+                    placeholder="Ej: Ofertón familiar encima de una mesa de madera en restaurante, iluminación cálida..."
+                  />
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-2">
               <Button type="button" variant="outline" onClick={generateImage} disabled={imgLoading}>
                 <Image className="w-4 h-4 mr-1" />
                 {imgLoading ? 'Generando...' : 'Generar imagen'}
               </Button>
             </div>
+
+            {lastMatch?.galleryItem && (
+              <div className="text-xs bg-green-50 border border-green-200 rounded-lg p-3 text-green-800">
+                <strong>Foto usada:</strong> {lastMatch.galleryItem.title}
+                {lastMatch.matchReason && <span className="block text-green-600 mt-1">Coincidencia: {lastMatch.matchReason}</span>}
+                {lastMatch.aiSource === 'composer' && (
+                  <span className="block text-green-600 mt-1">Edición con compositor inteligente (gratis). Agrega OPENAI_API_KEY para IA avanzada.</span>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-2 pt-4">
               <Button onClick={handleSubmit((d) => onSubmit(d, false))} disabled={saving}>

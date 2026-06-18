@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Calendar, FileEdit, LayoutTemplate, CheckCircle,
-  Share2, History, Building2, Users, Settings, LogOut, Menu, X,
+  Share2, History, Building2, Users, LogOut, Menu, X, Images,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,6 +12,7 @@ const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/calendar', icon: Calendar, label: 'Calendario' },
   { to: '/posts/new', icon: FileEdit, label: 'Crear publicación' },
+  { to: '/gallery', icon: Images, label: 'Galería' },
   { to: '/templates', icon: LayoutTemplate, label: 'Plantillas' },
   { to: '/approvals', icon: CheckCircle, label: 'Aprobaciones' },
   { to: '/social', icon: Share2, label: 'Redes sociales' },

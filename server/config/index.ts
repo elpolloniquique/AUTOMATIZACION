@@ -11,6 +11,7 @@ export const config = {
     anonKey: process.env.VITE_SUPABASE_ANON_KEY || '',
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
     storageBucket: process.env.SUPABASE_STORAGE_BUCKET || 'social-posts',
+    galleryBucket: process.env.SUPABASE_GALLERY_BUCKET || 'media-gallery',
   },
   meta: {
     appId: process.env.META_APP_ID || '',

@@ -1,0 +1,197 @@
+import axios from 'axios';
+import sharp from 'sharp';
+import { getSupabaseAdmin } from '../../utils/supabase.js';
+import { config } from '../../config/index.js';
+import { matchBestGalleryItem, type GalleryItem, type MatchInput } from './galleryMatcher.js';
+import { renderPostImage } from '../image-generator/renderPostImage.js';
+import { editGalleryImageWithAi } from './galleryAiEdit.js';
+import { composeGalleryImage, uploadComposedImage } from './galleryImageComposer.js';
+
+export type ImageGenerateMode = 'template' | 'gallery_auto' | 'gallery_prompt';
+
+export interface GenerateFromGalleryParams {
+  mode: ImageGenerateMode;
+  branchId?: string;
+  branchName: string;
+  offerTitle: string;
+  caption?: string;
+  postType?: string;
+  imagePrompt?: string;
+  templateSlug: string;
+  price?: string;
+  logoUrl?: string;
+  cta?: string;
+  brandColor?: string;
+  postId?: string;
+}
+
+export interface GenerateFromGalleryResult {
+  url: string;
+  mode: ImageGenerateMode;
+  galleryItem?: GalleryItem;
+  matchScore?: number;
+  matchReason?: string;
+  aiSource?: 'openai' | 'composer' | 'template';
+}
+
+export async function fetchGalleryItems(branchId?: string): Promise<GalleryItem[]> {
+  const supabase = getSupabaseAdmin();
+  let query = supabase
+    .from('media_gallery')
+    .select('*')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+
+  if (branchId) {
+    query = query.or(`branch_id.eq.${branchId},branch_id.is.null`);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return (data || []) as GalleryItem[];
+}
+
+export async function generatePostImage(params: GenerateFromGalleryParams): Promise<GenerateFromGalleryResult> {
+  if (params.mode === 'template') {
+    const url = await renderPostImage({
+      templateSlug: params.templateSlug,
+      branchName: params.branchName,
+      offerTitle: params.offerTitle,
+      price: params.price,
+      logoUrl: params.logoUrl,
+      cta: params.cta,
+      brandColor: params.brandColor,
+      postId: params.postId,
+    });
+    return { url, mode: 'template', aiSource: 'template' };
+  }
+
+  const items = await fetchGalleryItems(params.branchId);
+  if (items.length === 0) {
+    throw new Error('No hay fotos en la galería. Sube platos reales en el menú Galería primero.');
+  }
+
+  const matchInput: MatchInput = {
+    title: params.offerTitle,
+    caption: params.caption,
+    postType: params.postType,
+    branchId: params.branchId,
+  };
+
+  const match = matchBestGalleryItem(items, matchInput);
+  if (!match) {
+    throw new Error('No se encontró una foto compatible en la galería. Agrega más fotos con título y etiquetas.');
+  }
+
+  if (params.mode === 'gallery_auto') {
+    const url = await renderPostImage({
+      templateSlug: params.templateSlug,
+      branchName: params.branchName,
+      offerTitle: params.offerTitle,
+      price: params.price,
+      productImageUrl: match.item.public_url,
+      logoUrl: params.logoUrl,
+      cta: params.cta,
+      brandColor: params.brandColor,
+      postId: params.postId,
+    });
+    return {
+      url,
+      mode: 'gallery_auto',
+      galleryItem: match.item,
+      matchScore: match.score,
+      matchReason: match.reason,
+      aiSource: 'template',
+    };
+  }
+
+  // gallery_prompt
+  const prompt = params.imagePrompt?.trim() || `Presentación profesional de ${params.offerTitle}`;
+
+  if (config.openai.apiKey) {
+    const ai = await editGalleryImageWithAi({
+      photoUrl: match.item.public_url,
+      prompt,
+      title: params.offerTitle,
+      price: params.price,
+      brandColor: params.brandColor,
+    });
+    return {
+      url: ai.url,
+      mode: 'gallery_prompt',
+      galleryItem: match.item,
+      matchScore: match.score,
+      matchReason: match.reason,
+      aiSource: ai.source,
+    };
+  }
+
+  const buffer = await composeGalleryImage({
+    photoUrl: match.item.public_url,
+    prompt,
+    title: params.offerTitle,
+    price: params.price,
+    brandColor: params.brandColor,
+  });
+  const url = await uploadComposedImage(buffer, params.postId);
+  return {
+    url,
+    mode: 'gallery_prompt',
+    galleryItem: match.item,
+    matchScore: match.score,
+    matchReason: match.reason,
+    aiSource: 'composer',
+  };
+}
+
+export async function importGalleryFromUrl(
+  url: string,
+  meta: { title: string; description?: string; tags?: string[]; dish_type?: string; branch_id?: string; created_by?: string }
+): Promise<GalleryItem> {
+  const { data: imageData } = await axios.get(url, {
+    responseType: 'arraybuffer',
+    timeout: 30000,
+    maxContentLength: 10 * 1024 * 1024,
+  });
+
+  const buffer = Buffer.from(imageData);
+  const optimized = await sharp(buffer)
+    .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 88 })
+    .toBuffer();
+
+  const supabase = getSupabaseAdmin();
+  const branchPart = meta.branch_id || 'global';
+  const filePath = `${branchPart}/${Date.now()}-${sanitizeFilename(meta.title)}.jpg`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(config.supabase.galleryBucket)
+    .upload(filePath, optimized, { contentType: 'image/jpeg', upsert: false });
+
+  if (uploadError) throw new Error(`Error subiendo imagen: ${uploadError.message}`);
+
+  const { data: publicData } = supabase.storage.from(config.supabase.galleryBucket).getPublicUrl(filePath);
+
+  const { data, error } = await supabase
+    .from('media_gallery')
+    .insert({
+      branch_id: meta.branch_id || null,
+      title: meta.title,
+      description: meta.description || null,
+      tags: meta.tags || [],
+      dish_type: meta.dish_type || null,
+      file_path: filePath,
+      public_url: publicData.publicUrl,
+      source: 'url',
+      created_by: meta.created_by || null,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data as GalleryItem;
+}
+
+function sanitizeFilename(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) || 'foto';
+}

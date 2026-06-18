@@ -12,6 +12,7 @@ import SocialConfigPage from '@/pages/SocialConfigPage';
 import HistoryPage from '@/pages/HistoryPage';
 import BranchesPage from '@/pages/BranchesPage';
 import UsersPage from '@/pages/UsersPage';
+import GalleryPage from '@/pages/GalleryPage';
 
 function AppRoutes() {
   return (
@@ -65,6 +66,11 @@ function AppRoutes() {
       <Route path="/users" element={
         <ProtectedRoute roles={['super_admin']}>
           <DashboardLayout><UsersPage /></DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/gallery" element={
+        <ProtectedRoute>
+          <DashboardLayout><GalleryPage /></DashboardLayout>
         </ProtectedRoute>
       } />
       <Route path="*" element={<Navigate to="/" replace />} />
