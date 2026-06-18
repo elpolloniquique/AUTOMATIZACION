@@ -453,7 +453,12 @@ export default function PostCreatorPage() {
                   <span className="block text-green-700 mt-1 font-medium">✓ Generado con Google Gemini (gratis)</span>
                 )}
                 {lastMatch.aiSource === 'collage' && (
-                  <span className="block text-green-700 mt-1 font-medium">✓ Collage profesional de {lastMatch.galleryItems?.length} fotos</span>
+                  <span className="block text-green-700 mt-1 font-medium">
+                    ✓ Imagen generada con tu foto de galería
+                    {lastMatch.galleryItems && lastMatch.galleryItems.length > 1
+                      ? ` (${lastMatch.galleryItems.length} fotos en collage)`
+                      : ''}
+                  </span>
                 )}
                 {lastMatch.aiSource === 'composer' && (
                   <span className="block text-amber-700 mt-1">{lastMatch.aiWarning || 'Compositor básico.'}</span>

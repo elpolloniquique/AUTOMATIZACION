@@ -8,6 +8,23 @@ import { editGalleryImageWithAi } from './galleryAiEdit.js';
 
 import { composeMultiGalleryCollage, uploadComposedImage } from './galleryImageComposer.js';
 
+/** Compositor Sharp — funciona en Vercel sin Playwright/Chromium */
+async function renderGalleryPhotos(params: {
+  photoUrls: string[];
+  offerTitle: string;
+  price?: string;
+  brandColor?: string;
+  postId?: string;
+}): Promise<string> {
+  const buffer = await composeMultiGalleryCollage({
+    photoUrls: params.photoUrls,
+    title: params.offerTitle,
+    price: params.price,
+    brandColor: params.brandColor,
+  });
+  return uploadComposedImage(buffer, params.postId);
+}
+
 export type ImageGenerateMode = 'template' | 'gallery_auto' | 'gallery_prompt' | 'gallery_pick';
 
 export interface GenerateFromGalleryParams {
@@ -91,36 +108,13 @@ export async function generatePostImage(params: GenerateFromGalleryParams): Prom
 
     const mediaUrls = selected.map((item) => item.public_url);
 
-    if (selected.length === 1) {
-      const url = await renderPostImage({
-        templateSlug: params.templateSlug,
-        branchName: params.branchName,
-        offerTitle: params.offerTitle,
-        price: params.price,
-        productImageUrl: selected[0].public_url,
-        logoUrl: params.logoUrl,
-        cta: params.cta,
-        brandColor: params.brandColor,
-        postId: params.postId,
-      });
-      return {
-        url,
-        mode: 'gallery_pick',
-        galleryItem: selected[0],
-        galleryItems: selected,
-        mediaUrls,
-        matchReason: 'Selección manual de galería',
-        aiSource: 'template',
-      };
-    }
-
-    const collage = await composeMultiGalleryCollage({
+    const url = await renderGalleryPhotos({
       photoUrls: mediaUrls,
-      title: params.offerTitle,
+      offerTitle: params.offerTitle,
       price: params.price,
       brandColor: params.brandColor,
+      postId: params.postId,
     });
-    const url = await uploadComposedImage(collage, params.postId);
 
     return {
       url,
@@ -128,7 +122,9 @@ export async function generatePostImage(params: GenerateFromGalleryParams): Prom
       galleryItem: selected[0],
       galleryItems: selected,
       mediaUrls,
-      matchReason: `${selected.length} fotos seleccionadas manualmente`,
+      matchReason: selected.length === 1
+        ? 'Selección manual de galería'
+        : `${selected.length} fotos seleccionadas manualmente`,
       aiSource: 'collage',
     };
   }
@@ -151,14 +147,10 @@ export async function generatePostImage(params: GenerateFromGalleryParams): Prom
   }
 
   if (params.mode === 'gallery_auto') {
-    const url = await renderPostImage({
-      templateSlug: params.templateSlug,
-      branchName: params.branchName,
+    const url = await renderGalleryPhotos({
+      photoUrls: [match.item.public_url],
       offerTitle: params.offerTitle,
       price: params.price,
-      productImageUrl: match.item.public_url,
-      logoUrl: params.logoUrl,
-      cta: params.cta,
       brandColor: params.brandColor,
       postId: params.postId,
     });
@@ -168,7 +160,7 @@ export async function generatePostImage(params: GenerateFromGalleryParams): Prom
       galleryItem: match.item,
       matchScore: match.score,
       matchReason: match.reason,
-      aiSource: 'template',
+      aiSource: 'collage',
     };
   }
 

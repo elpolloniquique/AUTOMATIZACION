@@ -43,23 +43,79 @@ export async function renderPostImage(params: RenderPostImageParams): Promise<st
     throw new Error('Escribe un título antes de generar la imagen');
   }
 
-  const html = await loadTemplate(params.templateSlug);
-  const filledHtml = fillTemplate(html, {
-    branchName: params.branchName,
-    offerTitle: params.offerTitle,
-    price: params.price || 'Consulta precios',
-    productImageUrl: params.productImageUrl || '',
-    logoUrl: params.logoUrl || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect fill="%23c50000" width="80" height="80"/><text x="40" y="50" text-anchor="middle" fill="white" font-size="24">EP</text></svg>',
-    cta: params.cta || '📱 Haz tu pedido por WhatsApp',
-    brandColor: params.brandColor || '#c50000',
-    ...pollonImageTemplateVars(),
-  });
+  // Fotos de galería: Sharp (estable en Vercel, sin Chromium)
+  if (params.productImageUrl?.trim()) {
+    const { composeMultiGalleryCollage, uploadComposedImage } = await import('../gallery/galleryImageComposer.js');
+    const buffer = await composeMultiGalleryCollage({
+      photoUrls: [params.productImageUrl],
+      title: params.offerTitle,
+      price: params.price,
+      brandColor: params.brandColor,
+    });
+    return uploadComposedImage(buffer, params.postId);
+  }
 
-  const pngBuffer = await renderHtmlToPng(filledHtml);
-  const optimized = await sharp(pngBuffer).png({ quality: 90 }).toBuffer();
-  const publicUrl = await uploadToStorage(optimized, params.postId);
+  try {
+    const html = await loadTemplate(params.templateSlug);
+    const filledHtml = fillTemplate(html, {
+      branchName: params.branchName,
+      offerTitle: params.offerTitle,
+      price: params.price || 'Consulta precios',
+      productImageUrl: '',
+      logoUrl: params.logoUrl || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect fill="%23c50000" width="80" height="80"/><text x="40" y="50" text-anchor="middle" fill="white" font-size="24">EP</text></svg>',
+      cta: params.cta || '📱 Haz tu pedido por WhatsApp',
+      brandColor: params.brandColor || '#c50000',
+      ...pollonImageTemplateVars(),
+    });
 
-  return publicUrl;
+    const pngBuffer = await renderHtmlToPng(filledHtml);
+    const optimized = await sharp(pngBuffer).png({ quality: 90 }).toBuffer();
+    return uploadToStorage(optimized, params.postId);
+  } catch (err) {
+    console.warn('[renderPostImage] Playwright falló, usando plantilla Sharp:', err);
+    const fallback = await renderSharpTemplate(params);
+    return uploadToStorage(fallback, params.postId);
+  }
+}
+
+function escapeXml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** Plantilla gráfica sin navegador — fallback cuando Playwright no está disponible */
+async function renderSharpTemplate(params: RenderPostImageParams): Promise<Buffer> {
+  const size = 1080;
+  const brand = params.brandColor || '#c50000';
+  const title = escapeXml(params.offerTitle.slice(0, 50));
+  const price = escapeXml(params.price || '');
+  const branch = escapeXml(params.branchName.slice(0, 40));
+
+  const svg = Buffer.from(`
+    <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#0d0d0d"/>
+          <stop offset="60%" stop-color="#1a0000"/>
+          <stop offset="100%" stop-color="${brand}"/>
+        </linearGradient>
+        <linearGradient id="bar" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="${brand}"/>
+          <stop offset="100%" stop-color="#8b0000"/>
+        </linearGradient>
+      </defs>
+      <rect width="${size}" height="${size}" fill="url(#bg)"/>
+      <rect width="${size}" height="100" fill="url(#bar)"/>
+      <text x="36" y="42" fill="#fff" font-family="Arial,sans-serif" font-size="28" font-weight="800">EL POLLÓN</text>
+      <text x="36" y="72" fill="#ffcc00" font-family="Arial,sans-serif" font-size="16" font-weight="700">${branch}</text>
+      <text x="540" y="420" text-anchor="middle" fill="#f5a623" font-family="Arial,sans-serif" font-size="28" font-weight="900" letter-spacing="4">OFERTA</text>
+      <text x="540" y="520" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="52" font-weight="900">${title}</text>
+      ${price ? `<text x="540" y="620" text-anchor="middle" fill="#ffcc00" font-family="Arial,sans-serif" font-size="72" font-weight="900">${price}</text>` : ''}
+      <rect x="240" y="880" width="600" height="50" rx="25" fill="#25d366"/>
+      <text x="540" y="913" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="20" font-weight="800">WhatsApp +56 9 8692 5310 · el-pollon.cl</text>
+    </svg>
+  `);
+
+  return sharp(svg).png().toBuffer();
 }
 
 async function loadTemplate(slug: string): Promise<string> {
