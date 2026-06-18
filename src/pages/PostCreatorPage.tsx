@@ -72,7 +72,7 @@ export default function PostCreatorPage() {
           setOpenAiReady(Boolean(r.ai_configured));
           setAiProvider(r.ai_provider || null);
           setAiHint(r.hint || (r.gemini_key_set && !r.gemini_key_valid
-            ? 'GEMINI_API_KEY inválida: debe empezar con AIzaSy (crear en aistudio.google.com/app/apikey)'
+            ? 'GEMINI_API_KEY inválida: usa Copiar clave en aistudio.google.com (formato AIzaSy... o AQ....)'
             : null));
         })
         .catch(() => setOpenAiReady(false));

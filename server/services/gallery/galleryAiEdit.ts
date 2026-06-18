@@ -1,5 +1,6 @@
 import axios from 'axios';
 import sharp from 'sharp';
+import { GoogleGenAI, Modality } from '@google/genai';
 import { config } from '../../config/index.js';
 import { composeGalleryImage, uploadComposedImage, addBrandOverlay } from './galleryImageComposer.js';
 
@@ -20,16 +21,17 @@ export interface AiEditResult {
   warning?: string;
 }
 
-/** Claves válidas de Google AI Studio empiezan con AIzaSy */
+/** Claves Google AI Studio: AIzaSy (clásica) o AQ. (auth key nueva, 2026) */
 export function isValidGeminiKey(key: string): boolean {
   const k = key.trim();
-  return k.startsWith('AIza') && k.length >= 30;
+  if (k.startsWith('AIza') && k.length >= 30) return true;
+  if (k.startsWith('AQ.') && k.length >= 20) return true;
+  return false;
 }
 
 const GEMINI_IMAGE_MODELS = [
   'gemini-2.5-flash-image',
   'gemini-2.0-flash-preview-image-generation',
-  'gemini-2.0-flash-exp-image-generation',
 ];
 
 export async function editGalleryImageWithAi(options: AiEditOptions): Promise<AiEditResult> {
@@ -38,7 +40,7 @@ export async function editGalleryImageWithAi(options: AiEditOptions): Promise<Ai
   if (config.gemini.apiKey) {
     if (!isValidGeminiKey(config.gemini.apiKey)) {
       errors.push(
-        'GEMINI_API_KEY inválida: debe empezar con AIzaSy (cópiala desde aistudio.google.com/app/apikey)'
+        'GEMINI_API_KEY inválida: cópiala desde aistudio.google.com (formato AIzaSy... o AQ....)'
       );
     } else {
       try {
@@ -98,7 +100,7 @@ export function getAiConfigStatus(): {
 
   let hint: string | undefined;
   if (geminiSet && !geminiValid) {
-    hint = 'Tu GEMINI_API_KEY no es válida. Ve a aistudio.google.com/app/apikey y crea una que empiece con AIzaSy';
+    hint = 'Tu GEMINI_API_KEY no es válida. Cópiala desde aistudio.google.com → Detalles de la clave → Copiar clave';
   } else if (!geminiValid && !openaiSet) {
     hint = 'Agrega GEMINI_API_KEY gratis en Vercel (aistudio.google.com/app/apikey)';
   }
@@ -148,76 +150,66 @@ Reglas:
 async function tryGeminiEdit(options: AiEditOptions): Promise<string> {
   const { base64 } = await downloadAndPrepareImage(options.photoUrl);
   const editPrompt = buildGeminiEditPrompt(options.prompt);
+  const apiKey = config.gemini.apiKey.trim();
 
   let lastError = 'Sin respuesta de Gemini';
 
+  // SDK oficial — soporta claves AIza y AQ.
+  const ai = new GoogleGenAI({ apiKey });
+
   for (const model of GEMINI_IMAGE_MODELS) {
     try {
-      const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-        {
-          contents: [{
-            role: 'user',
-            parts: [
-              { text: editPrompt },
-              { inlineData: { mimeType: 'image/jpeg', data: base64 } },
-            ],
-          }],
-          generationConfig: {
-            responseModalities: ['TEXT', 'IMAGE'],
-          },
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{
+          role: 'user',
+          parts: [
+            { text: editPrompt },
+            { inlineData: { mimeType: 'image/jpeg', data: base64 } },
+          ],
+        }],
+        config: {
+          responseModalities: [Modality.TEXT, Modality.IMAGE],
         },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': config.gemini.apiKey,
-          },
-          timeout: 120000,
-          validateStatus: () => true,
-        }
-      );
+      });
 
-      if (response.status !== 200) {
-        const errBody = typeof response.data === 'object'
-          ? JSON.stringify(response.data).slice(0, 400)
-          : String(response.data).slice(0, 400);
-        lastError = `${model} HTTP ${response.status}: ${errBody}`;
-        continue;
-      }
-
-      const parts = response.data?.candidates?.[0]?.content?.parts || [];
-      const imagePart = parts.find((p: { inlineData?: { data?: string } }) => p.inlineData?.data);
+      const parts = response.candidates?.[0]?.content?.parts ?? [];
+      const imagePart = parts.find((p) => p.inlineData?.data);
       const imageB64 = imagePart?.inlineData?.data;
 
       if (!imageB64) {
-        const textPart = parts.find((p: { text?: string }) => p.text)?.text;
+        const textPart = parts.find((p) => p.text)?.text;
         lastError = textPart
-          ? `${model}: ${textPart.slice(0, 200)}`
+          ? `${model}: ${textPart.slice(0, 250)}`
           : `${model}: sin imagen en respuesta`;
         continue;
       }
 
-      let result = await sharp(Buffer.from(imageB64, 'base64'))
-        .resize(1080, 1080, { fit: 'cover' })
-        .png()
-        .toBuffer();
-
-      if (!options.skipBrandOverlay) {
-        result = await addBrandOverlay(result, {
-          title: options.title,
-          price: options.price,
-          brandColor: options.brandColor,
-        });
-      }
-
-      return uploadComposedImage(result);
+      return await finalizeGeminiImage(imageB64, options);
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
-      console.warn(`[Gemini] ${model}:`, lastError);
+      console.warn(`[Gemini SDK] ${model}:`, lastError);
     }
   }
 
   throw new Error(lastError);
+}
+
+async function finalizeGeminiImage(imageB64: string, options: AiEditOptions): Promise<string> {
+  let result = await sharp(Buffer.from(imageB64, 'base64'))
+    .resize(1080, 1080, { fit: 'cover' })
+    .png()
+    .toBuffer();
+
+  if (!options.skipBrandOverlay) {
+    result = await addBrandOverlay(result, {
+      title: options.title,
+      price: options.price,
+      brandColor: options.brandColor,
+    });
+  }
+
+  return uploadComposedImage(result);
 }
 
 async function tryOpenAiEdit(options: AiEditOptions): Promise<string> {
