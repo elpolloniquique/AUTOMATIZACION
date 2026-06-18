@@ -11,54 +11,108 @@ export interface AiEditOptions {
   title?: string;
   price?: string;
   brandColor?: string;
+  skipBrandOverlay?: boolean;
 }
 
 export interface AiEditResult {
   url: string;
   source: AiEditSource;
+  warning?: string;
 }
 
-const GEMINI_MODELS = [
-  'gemini-2.0-flash-preview-image-generation',
+/** Claves válidas de Google AI Studio empiezan con AIzaSy */
+export function isValidGeminiKey(key: string): boolean {
+  const k = key.trim();
+  return k.startsWith('AIza') && k.length >= 30;
+}
+
+const GEMINI_IMAGE_MODELS = [
   'gemini-2.5-flash-image',
+  'gemini-2.0-flash-preview-image-generation',
   'gemini-2.0-flash-exp-image-generation',
 ];
 
 export async function editGalleryImageWithAi(options: AiEditOptions): Promise<AiEditResult> {
+  const errors: string[] = [];
+
   if (config.gemini.apiKey) {
-    try {
-      const url = await tryGeminiEdit(options);
-      return { url, source: 'gemini' };
-    } catch (err) {
-      console.warn('[Gallery AI] Gemini falló:', err instanceof Error ? err.message : err);
+    if (!isValidGeminiKey(config.gemini.apiKey)) {
+      errors.push(
+        'GEMINI_API_KEY inválida: debe empezar con AIzaSy (cópiala desde aistudio.google.com/app/apikey)'
+      );
+    } else {
+      try {
+        const url = await tryGeminiEdit(options);
+        return { url, source: 'gemini' };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        errors.push(`Gemini: ${msg}`);
+        console.warn('[Gallery AI] Gemini falló:', msg);
+      }
     }
   }
 
-  if (config.openai.apiKey) {
+  if (config.openai.apiKey?.startsWith('sk-')) {
     try {
       const url = await tryOpenAiEdit(options);
       return { url, source: 'openai' };
     } catch (err) {
-      console.warn('[Gallery AI] OpenAI falló:', err instanceof Error ? err.message : err);
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`OpenAI: ${msg}`);
+      console.warn('[Gallery AI] OpenAI falló:', msg);
     }
   }
 
   const buffer = await composeGalleryImage(options);
   const url = await uploadComposedImage(buffer);
-  return { url, source: 'composer' };
+  return {
+    url,
+    source: 'composer',
+    warning: errors.length
+      ? `IA no disponible (${errors.join(' | ')}). Se usó compositor básico.`
+      : 'Sin API de IA configurada. Se usó compositor básico.',
+  };
 }
 
 export function getActiveAiProvider(): AiEditSource | null {
-  if (config.gemini.apiKey) return 'gemini';
-  if (config.openai.apiKey) return 'openai';
+  if (config.gemini.apiKey && isValidGeminiKey(config.gemini.apiKey)) return 'gemini';
+  if (config.openai.apiKey?.startsWith('sk-')) return 'openai';
+  if (config.gemini.apiKey) return null; // key presente pero inválida
   return null;
 }
 
 export function isAdvancedAiConfigured(): boolean {
-  return Boolean(config.gemini.apiKey || config.openai.apiKey);
+  return getActiveAiProvider() !== null;
 }
 
-/** @deprecated use isAdvancedAiConfigured */
+export function getAiConfigStatus(): {
+  gemini_key_set: boolean;
+  gemini_key_valid: boolean;
+  openai_key_set: boolean;
+  active_provider: AiEditSource | null;
+  hint?: string;
+} {
+  const geminiSet = Boolean(config.gemini.apiKey?.trim());
+  const geminiValid = geminiSet && isValidGeminiKey(config.gemini.apiKey);
+  const openaiSet = Boolean(config.openai.apiKey?.startsWith('sk-'));
+
+  let hint: string | undefined;
+  if (geminiSet && !geminiValid) {
+    hint = 'Tu GEMINI_API_KEY no es válida. Ve a aistudio.google.com/app/apikey y crea una que empiece con AIzaSy';
+  } else if (!geminiValid && !openaiSet) {
+    hint = 'Agrega GEMINI_API_KEY gratis en Vercel (aistudio.google.com/app/apikey)';
+  }
+
+  return {
+    gemini_key_set: geminiSet,
+    gemini_key_valid: geminiValid,
+    openai_key_set: openaiSet,
+    active_provider: getActiveAiProvider(),
+    hint,
+  };
+}
+
+/** @deprecated */
 export function isOpenAiConfigured(): boolean {
   return isAdvancedAiConfigured();
 }
@@ -78,29 +132,35 @@ async function downloadAndPrepareImage(url: string): Promise<{ base64: string; b
   return { base64: buffer.toString('base64'), buffer };
 }
 
+function buildGeminiEditPrompt(userPrompt: string): string {
+  return `Eres un editor de imágenes profesional (como Gemini en chat). Edita la imagen según las instrucciones del usuario.
+
+INSTRUCCIONES DEL USUARIO (síguelas al pie de la letra):
+${userPrompt}
+
+Reglas:
+- Aplica exactamente lo que pide el usuario (cambiar fondo, poner en mesa, eliminar fondo, fondo blanco, mejorar luz, etc.).
+- Mantén la comida lo más natural y apetitosa posible salvo que el usuario pida cambiarla.
+- Resultado: fotografía realista lista para Instagram/Facebook de pollería.
+- NO agregues texto, logos ni marcas de agua en la imagen.`;
+}
+
 async function tryGeminiEdit(options: AiEditOptions): Promise<string> {
   const { base64 } = await downloadAndPrepareImage(options.photoUrl);
-
-  const editPrompt = `Eres un fotógrafo gastronómico profesional para la pollería "El Pollón".
-Edita esta foto de comida para redes sociales (Instagram/Facebook).
-
-REGLA CRÍTICA: Mantén el plato IDÉNTICO — mismo pollo a la brasa, papas, ensalada, salsas, colores y texturas. No cambies la comida.
-Solo modifica el ENTORNO, iluminación y fondo según: ${options.prompt}
-
-Estilo: fotografía realista de restaurante, iluminación cálida, alta calidad comercial.
-NO agregues texto, logos ni marcas de agua.`;
+  const editPrompt = buildGeminiEditPrompt(options.prompt);
 
   let lastError = 'Sin respuesta de Gemini';
 
-  for (const model of GEMINI_MODELS) {
+  for (const model of GEMINI_IMAGE_MODELS) {
     try {
       const response = await axios.post(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
         {
           contents: [{
+            role: 'user',
             parts: [
               { text: editPrompt },
-              { inline_data: { mime_type: 'image/jpeg', data: base64 } },
+              { inlineData: { mimeType: 'image/jpeg', data: base64 } },
             ],
           }],
           generationConfig: {
@@ -113,17 +173,27 @@ NO agregues texto, logos ni marcas de agua.`;
             'x-goog-api-key': config.gemini.apiKey,
           },
           timeout: 120000,
+          validateStatus: () => true,
         }
       );
 
-      const parts = response.data?.candidates?.[0]?.content?.parts || [];
-      const imagePart = parts.find((p: { inlineData?: { data?: string }; inline_data?: { data?: string } }) =>
-        p.inlineData?.data || p.inline_data?.data
-      );
+      if (response.status !== 200) {
+        const errBody = typeof response.data === 'object'
+          ? JSON.stringify(response.data).slice(0, 400)
+          : String(response.data).slice(0, 400);
+        lastError = `${model} HTTP ${response.status}: ${errBody}`;
+        continue;
+      }
 
-      const imageB64 = imagePart?.inlineData?.data || imagePart?.inline_data?.data;
+      const parts = response.data?.candidates?.[0]?.content?.parts || [];
+      const imagePart = parts.find((p: { inlineData?: { data?: string } }) => p.inlineData?.data);
+      const imageB64 = imagePart?.inlineData?.data;
+
       if (!imageB64) {
-        lastError = `Modelo ${model}: sin imagen en respuesta`;
+        const textPart = parts.find((p: { text?: string }) => p.text)?.text;
+        lastError = textPart
+          ? `${model}: ${textPart.slice(0, 200)}`
+          : `${model}: sin imagen en respuesta`;
         continue;
       }
 
@@ -132,16 +202,18 @@ NO agregues texto, logos ni marcas de agua.`;
         .png()
         .toBuffer();
 
-      result = await addBrandOverlay(result, {
-        title: options.title,
-        price: options.price,
-        brandColor: options.brandColor,
-      });
+      if (!options.skipBrandOverlay) {
+        result = await addBrandOverlay(result, {
+          title: options.title,
+          price: options.price,
+          brandColor: options.brandColor,
+        });
+      }
 
       return uploadComposedImage(result);
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
-      console.warn(`[Gemini] Modelo ${model} falló:`, lastError);
+      console.warn(`[Gemini] ${model}:`, lastError);
     }
   }
 
@@ -150,12 +222,10 @@ NO agregues texto, logos ni marcas de agua.`;
 
 async function tryOpenAiEdit(options: AiEditOptions): Promise<string> {
   const { buffer: imageBuffer } = await downloadAndPrepareImage(options.photoUrl);
-
   const pngBuffer = await sharp(imageBuffer).png().toBuffer();
 
-  const fullPrompt = `Imagen publicitaria profesional para pollería "El Pollón".
-MANTÉN el plato EXACTAMENTE igual. Solo cambia el entorno: ${options.prompt}
-Estilo fotográfico realista, sin texto ni logos.`;
+  const fullPrompt = `Editor de imágenes profesional. Aplica exactamente: ${options.prompt}
+Mantén la comida natural. Sin texto ni logos.`;
 
   const form = new FormData();
   form.append('model', 'gpt-image-1');
@@ -187,11 +257,13 @@ Estilo fotográfico realista, sin texto ni logos.`;
     .png()
     .toBuffer();
 
-  result = await addBrandOverlay(result, {
-    title: options.title,
-    price: options.price,
-    brandColor: options.brandColor,
-  });
+  if (!options.skipBrandOverlay) {
+    result = await addBrandOverlay(result, {
+      title: options.title,
+      price: options.price,
+      brandColor: options.brandColor,
+    });
+  }
 
   return uploadComposedImage(result);
 }

@@ -11,7 +11,7 @@ import { generateContent } from './services/ai/contentGenerator.js';
 import { AVAILABLE_TEMPLATES } from './services/image-generator/renderPostImage.js';
 import { generatePostImage, fetchGalleryItems, importGalleryFromUrl } from './services/gallery/galleryService.js';
 import { matchTopGalleryItems } from './services/gallery/galleryMatcher.js';
-import { isAdvancedAiConfigured, getActiveAiProvider } from './services/gallery/galleryAiEdit.js';
+import { isAdvancedAiConfigured, getActiveAiProvider, getAiConfigStatus } from './services/gallery/galleryAiEdit.js';
 import { testFacebookConnection } from './services/meta/facebookPublisher.js';
 import { testInstagramConnection } from './services/meta/instagramPublisher.js';
 import { testGoogleBusinessConnection } from './services/google-business/googleBusinessPublisher.js';
@@ -146,10 +146,12 @@ app.post('/api/images/generate', authMiddleware, asyncHandler(async (req, res) =
 }));
 
 app.get('/api/images/templates', authMiddleware, (_req, res) => {
+  const aiStatus = getAiConfigStatus();
   res.json({
     templates: AVAILABLE_TEMPLATES,
     ai_configured: isAdvancedAiConfigured(),
     ai_provider: getActiveAiProvider(),
+    ...aiStatus,
   });
 });
 

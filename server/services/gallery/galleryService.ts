@@ -31,6 +31,7 @@ export interface GenerateFromGalleryResult {
   matchScore?: number;
   matchReason?: string;
   aiSource?: 'gemini' | 'openai' | 'composer' | 'template';
+  aiWarning?: string;
 }
 
 export async function fetchGalleryItems(branchId?: string): Promise<GalleryItem[]> {
@@ -122,6 +123,7 @@ export async function generatePostImage(params: GenerateFromGalleryParams): Prom
     matchScore: match.score,
     matchReason: match.reason,
     aiSource: ai.source,
+    aiWarning: ai.warning,
   };
 }
 

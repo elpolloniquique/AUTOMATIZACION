@@ -132,6 +132,7 @@ export interface ImageGenerateResult {
   matchScore?: number;
   matchReason?: string;
   aiSource?: 'gemini' | 'openai' | 'composer' | 'template';
+  aiWarning?: string;
 }
 
 export interface DashboardStats {

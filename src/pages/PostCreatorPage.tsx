@@ -46,6 +46,7 @@ export default function PostCreatorPage() {
   const [lastMatch, setLastMatch] = useState<ImageGenerateResult | null>(null);
   const [openAiReady, setOpenAiReady] = useState<boolean | null>(null);
   const [aiProvider, setAiProvider] = useState<string | null>(null);
+  const [aiHint, setAiHint] = useState<string | null>(null);
 
   const { register, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm<PostForm>({
     resolver: zodResolver(postSchema),
@@ -60,10 +61,19 @@ export default function PostCreatorPage() {
 
   useEffect(() => {
     if (session?.access_token) {
-      apiFetch<{ ai_configured?: boolean; ai_provider?: string }>('/api/images/templates', { token: session.access_token })
+      apiFetch<{
+        ai_configured?: boolean;
+        ai_provider?: string;
+        hint?: string;
+        gemini_key_set?: boolean;
+        gemini_key_valid?: boolean;
+      }>('/api/images/templates', { token: session.access_token })
         .then((r) => {
           setOpenAiReady(Boolean(r.ai_configured));
           setAiProvider(r.ai_provider || null);
+          setAiHint(r.hint || (r.gemini_key_set && !r.gemini_key_valid
+            ? 'GEMINI_API_KEY inválida: debe empezar con AIzaSy (crear en aistudio.google.com/app/apikey)'
+            : null));
         })
         .catch(() => setOpenAiReady(false));
     }
@@ -288,7 +298,12 @@ export default function PostCreatorPage() {
                   </div>
                 </label>
               </div>
-              {imageMode === 'gallery_prompt' && openAiReady === false && (
+              {imageMode === 'gallery_prompt' && aiHint && (
+                <div className="text-xs bg-red-50 border border-red-300 rounded-lg p-3 text-red-800">
+                  <strong>Problema con la API:</strong> {aiHint}
+                </div>
+              )}
+              {imageMode === 'gallery_prompt' && !aiHint && openAiReady === false && (
                 <div className="text-xs bg-amber-50 border border-amber-300 rounded-lg p-3 text-amber-900">
                   <strong>IA avanzada no configurada.</strong> Agrega <code className="bg-amber-100 px-1 rounded">GEMINI_API_KEY</code> gratis en Vercel (recomendado) o <code className="bg-amber-100 px-1 rounded">OPENAI_API_KEY</code> de pago.
                 </div>
@@ -298,7 +313,7 @@ export default function PostCreatorPage() {
                   <strong>IA avanzada activa</strong>
                   {aiProvider === 'gemini' && ' (Google Gemini — gratis)'}
                   {aiProvider === 'openai' && ' (OpenAI — de pago)'}
-                  . Editará tu foto manteniendo el plato natural según tu prompt.
+                  . Edita la foto según tu prompt (como Gemini en chat).
                 </div>
               )}
               {imageMode === 'gallery_prompt' && (
@@ -332,7 +347,9 @@ export default function PostCreatorPage() {
                   <span className="block text-green-700 mt-1 font-medium">✓ Generado con OpenAI (de pago)</span>
                 )}
                 {lastMatch.aiSource === 'composer' && (
-                  <span className="block text-amber-700 mt-1">Compositor básico. Agrega GEMINI_API_KEY gratis para resultados fotorealistas.</span>
+                  <span className="block text-amber-700 mt-1">
+                    {lastMatch.aiWarning || 'Compositor básico. Configura GEMINI_API_KEY válida (AIzaSy...) en Vercel.'}
+                  </span>
                 )}
               </div>
             )}
