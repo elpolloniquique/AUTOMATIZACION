@@ -12,6 +12,16 @@ import type { Branch, MediaGalleryItem, PostType } from '@/types';
 import { POST_TYPE_LABELS } from '@/types';
 import { Upload, Link2, Trash2, Pencil, ImageIcon, X, Check, ArrowLeft } from 'lucide-react';
 
+const GALLERY_BUCKET = 'media-gallery';
+
+const emptyForm = {
+  title: '',
+  description: '',
+  tags: '',
+  dish_type: '' as PostType | '',
+  branch_id: '',
+};
+
 export default function GalleryPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -30,16 +40,6 @@ export default function GalleryPage() {
   const [showForm, setShowForm] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  const GALLERY_BUCKET = 'media-gallery';
-
-  const emptyForm = {
-    title: '',
-    description: '',
-    tags: '',
-    dish_type: '' as PostType | '',
-    branch_id: '',
-  };
 
   useEffect(() => {
     supabase.from('branches').select('*').eq('is_active', true).then(({ data }) => {
