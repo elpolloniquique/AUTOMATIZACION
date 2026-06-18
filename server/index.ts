@@ -104,7 +104,7 @@ function optionalString() {
 
 app.post('/api/images/generate', authMiddleware, asyncHandler(async (req, res) => {
   const schema = z.object({
-    mode: z.enum(['template', 'gallery_auto', 'gallery_prompt']).default('gallery_auto'),
+    mode: z.enum(['template', 'gallery_auto', 'gallery_prompt', 'gallery_pick']).default('gallery_auto'),
     template_slug: z.string(),
     branch_name: z.string(),
     branch_id: z.string().uuid().optional(),
@@ -118,6 +118,7 @@ app.post('/api/images/generate', authMiddleware, asyncHandler(async (req, res) =
     cta: optionalString(),
     brand_color: optionalString(),
     post_id: z.string().uuid().optional(),
+    gallery_item_ids: z.array(z.string().uuid()).min(1).max(4).optional(),
   });
 
   const parsed = schema.safeParse(req.body);
@@ -141,6 +142,7 @@ app.post('/api/images/generate', authMiddleware, asyncHandler(async (req, res) =
     cta: parsed.data.cta,
     brandColor: parsed.data.brand_color,
     postId: parsed.data.post_id,
+    galleryItemIds: parsed.data.gallery_item_ids,
   });
   res.json(result);
 }));
@@ -241,6 +243,58 @@ app.post('/api/social/publish-test', authMiddleware, roleGuard('super_admin', 'a
 
   const result = await publishSinglePost(post);
   res.json(result);
+}));
+
+app.post('/api/posts/:id/republish', authMiddleware, asyncHandler(async (req, res) => {
+  const schema = z.object({
+    scheduled_at: z.string().optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: zodErrorMessage(parsed) });
+
+  const supabase = getSupabaseAdmin();
+  const postId = String(req.params.id);
+  const branchId = await getPostBranchId(supabase, postId);
+  assertBranchAccess(req.user!, branchId);
+
+  const { data: original, error } = await supabase.from('posts').select('*').eq('id', postId).single();
+  if (error || !original) return res.status(404).json({ error: 'Publicación no encontrada' });
+
+  const scheduledAt = parsed.data.scheduled_at
+    ? new Date(parsed.data.scheduled_at).toISOString()
+    : null;
+
+  const { data: clone, error: insertError } = await supabase
+    .from('posts')
+    .insert({
+      branch_id: original.branch_id,
+      created_by: req.user!.id,
+      title: original.title,
+      caption: original.caption,
+      cta: original.cta,
+      hashtags: original.hashtags,
+      platform: original.platform,
+      post_type: original.post_type,
+      media_url: original.media_url,
+      generated_image_url: original.generated_image_url,
+      media_urls: original.media_urls || [],
+      gallery_item_ids: original.gallery_item_ids || [],
+      image_mode: original.image_mode,
+      price: original.price,
+      product_name: original.product_name,
+      scheduled_at: scheduledAt,
+      status: scheduledAt ? 'pending_approval' : 'draft',
+      approval_status: 'pending',
+      source_post_id: original.id,
+    })
+    .select()
+    .single();
+
+  if (insertError || !clone) {
+    return res.status(500).json({ error: insertError?.message || 'Error al republicar' });
+  }
+
+  res.json({ success: true, post: clone });
 }));
 
 app.post('/api/posts/:id/retry', authMiddleware, roleGuard('super_admin', 'admin_sucursal', 'aprobador'), asyncHandler(async (req, res) => {

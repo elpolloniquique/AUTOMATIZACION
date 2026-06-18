@@ -82,6 +82,10 @@ export interface Post {
   post_type: PostType;
   media_url: string | null;
   generated_image_url: string | null;
+  media_urls: string[] | null;
+  gallery_item_ids: string[] | null;
+  image_mode: ImageGenerateMode | null;
+  source_post_id: string | null;
   scheduled_at: string | null;
   published_at: string | null;
   status: PostStatus;
@@ -108,7 +112,27 @@ export interface PostLog {
   created_at: string;
 }
 
-export type ImageGenerateMode = 'template' | 'gallery_auto' | 'gallery_prompt';
+export type ImageGenerateMode = 'template' | 'gallery_auto' | 'gallery_prompt' | 'gallery_pick';
+
+export type ContentTagCategory = 'marca' | 'plato' | 'promo' | 'ubicacion' | 'general';
+
+export interface ContentTag {
+  id: string;
+  branch_id: string | null;
+  name: string;
+  category: ContentTagCategory;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export const TAG_CATEGORY_LABELS: Record<ContentTagCategory, string> = {
+  marca: 'Marca',
+  plato: 'Plato',
+  promo: 'Promoción',
+  ubicacion: 'Ubicación',
+  general: 'General',
+};
 
 export interface MediaGalleryItem {
   id: string;
@@ -129,9 +153,11 @@ export interface ImageGenerateResult {
   url: string;
   mode: ImageGenerateMode;
   galleryItem?: MediaGalleryItem;
+  galleryItems?: MediaGalleryItem[];
+  mediaUrls?: string[];
   matchScore?: number;
   matchReason?: string;
-  aiSource?: 'gemini' | 'openai' | 'composer' | 'template';
+  aiSource?: 'gemini' | 'openai' | 'composer' | 'template' | 'collage';
   aiWarning?: string;
 }
 

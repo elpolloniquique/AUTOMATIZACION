@@ -6,7 +6,9 @@ import { matchBestGalleryItem, type GalleryItem, type MatchInput } from './galle
 import { renderPostImage } from '../image-generator/renderPostImage.js';
 import { editGalleryImageWithAi } from './galleryAiEdit.js';
 
-export type ImageGenerateMode = 'template' | 'gallery_auto' | 'gallery_prompt';
+import { composeMultiGalleryCollage, uploadComposedImage } from './galleryImageComposer.js';
+
+export type ImageGenerateMode = 'template' | 'gallery_auto' | 'gallery_prompt' | 'gallery_pick';
 
 export interface GenerateFromGalleryParams {
   mode: ImageGenerateMode;
@@ -22,15 +24,18 @@ export interface GenerateFromGalleryParams {
   cta?: string;
   brandColor?: string;
   postId?: string;
+  galleryItemIds?: string[];
 }
 
 export interface GenerateFromGalleryResult {
   url: string;
   mode: ImageGenerateMode;
   galleryItem?: GalleryItem;
+  galleryItems?: GalleryItem[];
+  mediaUrls?: string[];
   matchScore?: number;
   matchReason?: string;
-  aiSource?: 'gemini' | 'openai' | 'composer' | 'template';
+  aiSource?: 'gemini' | 'openai' | 'composer' | 'template' | 'collage';
   aiWarning?: string;
 }
 
@@ -64,6 +69,68 @@ export async function generatePostImage(params: GenerateFromGalleryParams): Prom
       postId: params.postId,
     });
     return { url, mode: 'template', aiSource: 'template' };
+  }
+
+  if (params.mode === 'gallery_pick') {
+    const ids = params.galleryItemIds?.filter(Boolean) ?? [];
+    if (ids.length === 0) {
+      throw new Error('Selecciona al menos 1 foto de la galería (máximo 4).');
+    }
+    if (ids.length > 4) {
+      throw new Error('Máximo 4 fotos por publicación.');
+    }
+
+    const allItems = await fetchGalleryItems(params.branchId);
+    const selected = ids
+      .map((id) => allItems.find((item) => item.id === id))
+      .filter((item): item is GalleryItem => Boolean(item));
+
+    if (selected.length === 0) {
+      throw new Error('Las fotos seleccionadas no están disponibles en la galería.');
+    }
+
+    const mediaUrls = selected.map((item) => item.public_url);
+
+    if (selected.length === 1) {
+      const url = await renderPostImage({
+        templateSlug: params.templateSlug,
+        branchName: params.branchName,
+        offerTitle: params.offerTitle,
+        price: params.price,
+        productImageUrl: selected[0].public_url,
+        logoUrl: params.logoUrl,
+        cta: params.cta,
+        brandColor: params.brandColor,
+        postId: params.postId,
+      });
+      return {
+        url,
+        mode: 'gallery_pick',
+        galleryItem: selected[0],
+        galleryItems: selected,
+        mediaUrls,
+        matchReason: 'Selección manual de galería',
+        aiSource: 'template',
+      };
+    }
+
+    const collage = await composeMultiGalleryCollage({
+      photoUrls: mediaUrls,
+      title: params.offerTitle,
+      price: params.price,
+      brandColor: params.brandColor,
+    });
+    const url = await uploadComposedImage(collage, params.postId);
+
+    return {
+      url,
+      mode: 'gallery_pick',
+      galleryItem: selected[0],
+      galleryItems: selected,
+      mediaUrls,
+      matchReason: `${selected.length} fotos seleccionadas manualmente`,
+      aiSource: 'collage',
+    };
   }
 
   const items = await fetchGalleryItems(params.branchId);

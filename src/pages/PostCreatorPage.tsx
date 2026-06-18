@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,7 +12,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SocialPreview } from '@/components/SocialPreview';
-import type { Branch, Platform, PostType, ImageGenerateMode, ImageGenerateResult } from '@/types';
+import { HashtagEditor } from '@/components/HashtagEditor';
+import { GallerySelectionBar } from '@/components/GallerySelectionBar';
+import type { Branch, Platform, PostType, ImageGenerateMode, ImageGenerateResult, MediaGalleryItem } from '@/types';
 import { PLATFORM_LABELS, POST_TYPE_LABELS } from '@/types';
 import { POLLON_CONTACT } from '@/constants/pollonBrand';
 
@@ -32,21 +34,32 @@ const postSchema = z.object({
 
 type PostForm = z.infer<typeof postSchema>;
 
+interface GalleryPickState {
+  selectedGalleryIds?: string[];
+  selectedGalleryItems?: MediaGalleryItem[];
+}
+
 export default function PostCreatorPage() {
   const { id } = useParams();
+  const location = useLocation();
   const { session, profile } = useAuth();
   const navigate = useNavigate();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [imageUrl, setImageUrl] = useState('');
+  const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
+  const [hashtagAiLoading, setHashtagAiLoading] = useState(false);
   const [imgLoading, setImgLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [imageMode, setImageMode] = useState<ImageGenerateMode>('gallery_auto');
   const [imagePrompt, setImagePrompt] = useState('');
+  const [selectedGallery, setSelectedGallery] = useState<MediaGalleryItem[]>([]);
   const [lastMatch, setLastMatch] = useState<ImageGenerateResult | null>(null);
   const [openAiReady, setOpenAiReady] = useState<boolean | null>(null);
   const [aiProvider, setAiProvider] = useState<string | null>(null);
   const [aiHint, setAiHint] = useState<string | null>(null);
+
+  const returnPath = id ? `/posts/${id}/edit` : '/posts/new';
 
   const { register, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm<PostForm>({
     resolver: zodResolver(postSchema),
@@ -58,6 +71,15 @@ export default function PostCreatorPage() {
   });
 
   const watched = watch();
+
+  useEffect(() => {
+    const pick = location.state as GalleryPickState | null;
+    if (pick?.selectedGalleryItems?.length) {
+      setSelectedGallery(pick.selectedGalleryItems);
+      setImageMode('gallery_pick');
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     if (session?.access_token) {
@@ -102,6 +124,22 @@ export default function PostCreatorPage() {
         product_name: data.product_name || '',
       });
       setImageUrl(data.generated_image_url || data.media_url || '');
+      setMediaUrls(data.media_urls || []);
+      if (data.image_mode) setImageMode(data.image_mode as ImageGenerateMode);
+
+      const galleryIds = data.gallery_item_ids as string[] | null;
+      if (galleryIds?.length) {
+        const { data: galleryItems } = await supabase
+          .from('media_gallery')
+          .select('*')
+          .in('id', galleryIds);
+        if (galleryItems?.length) {
+          const ordered = galleryIds
+            .map((gid) => galleryItems.find((g) => g.id === gid))
+            .filter(Boolean) as MediaGalleryItem[];
+          setSelectedGallery(ordered);
+        }
+      }
     }
   }
 
@@ -134,11 +172,46 @@ export default function PostCreatorPage() {
     }
   }
 
+  async function generateHashtagsAI() {
+    const branch = branches.find((b) => b.id === watched.branch_id);
+    if (!branch || !session?.access_token) return;
+    setHashtagAiLoading(true);
+    try {
+      const result = await apiFetch<{ result: string }>('/api/ai/generate', {
+        method: 'POST',
+        token: session.access_token,
+        body: JSON.stringify({
+          branch_id: branch.id,
+          type: 'hashtags',
+          post_type: watched.post_type,
+          branch_name: branch.name,
+          city: branch.city,
+          product_name: watched.product_name || watched.title,
+          price: watched.price,
+        }),
+      });
+      const tags = result.result
+        .replace(/#/g, '')
+        .split(/[\s,]+/)
+        .map((t) => t.trim())
+        .filter(Boolean);
+      setValue('hashtags', tags.join(', '));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error generando hashtags');
+    } finally {
+      setHashtagAiLoading(false);
+    }
+  }
+
   async function generateImage() {
     const branch = branches.find((b) => b.id === watched.branch_id);
     if (!branch || !session?.access_token) return;
     if (!watched.title?.trim()) {
       alert('Escribe un título antes de generar la imagen');
+      return;
+    }
+    if (imageMode === 'gallery_pick' && selectedGallery.length === 0) {
+      alert('Selecciona al menos 1 foto de la galería');
       return;
     }
     setImgLoading(true);
@@ -159,16 +232,19 @@ export default function PostCreatorPage() {
           caption: watched.caption || undefined,
           post_type: watched.post_type,
           image_prompt: imageMode === 'gallery_prompt' ? imagePrompt : undefined,
+          gallery_item_ids: imageMode === 'gallery_pick' ? selectedGallery.map((g) => g.id) : undefined,
           price: watched.price || undefined,
           logo_url: branch.logo_url || undefined,
           cta: watched.cta || POLLON_CONTACT.defaultCta,
           brand_color: branch.brand_color || '#c50000',
+          post_id: id,
         }),
       });
       setImageUrl(result.url);
+      setMediaUrls(result.mediaUrls || selectedGallery.map((g) => g.public_url));
       setLastMatch(result);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error generando imagen. ¿Playwright instalado?');
+      alert(err instanceof Error ? err.message : 'Error generando imagen');
     } finally {
       setImgLoading(false);
     }
@@ -176,7 +252,7 @@ export default function PostCreatorPage() {
 
   async function onSubmit(data: PostForm, submitForApproval = false) {
     setSaving(true);
-    const hashtags = data.hashtags?.split(',').map((h) => h.trim()).filter(Boolean) || [];
+    const hashtags = data.hashtags?.split(',').map((h) => h.trim().replace(/^#/, '')).filter(Boolean) || [];
     const payload = {
       branch_id: data.branch_id,
       created_by: profile?.id,
@@ -190,6 +266,9 @@ export default function PostCreatorPage() {
       price: data.price,
       product_name: data.product_name,
       generated_image_url: imageUrl || null,
+      media_urls: mediaUrls.length ? mediaUrls : null,
+      gallery_item_ids: selectedGallery.length ? selectedGallery.map((g) => g.id) : null,
+      image_mode: imageMode,
       status: submitForApproval ? 'pending_approval' : 'draft',
       approval_status: 'pending',
     };
@@ -204,6 +283,10 @@ export default function PostCreatorPage() {
     } else {
       navigate(submitForApproval ? '/approvals' : '/calendar');
     }
+  }
+
+  function removeGalleryItem(itemId: string) {
+    setSelectedGallery((prev) => prev.filter((g) => g.id !== itemId));
   }
 
   return (
@@ -255,7 +338,7 @@ export default function PostCreatorPage() {
                   {aiLoading ? 'Generando...' : 'Generar con IA'}
                 </Button>
               </div>
-              <textarea className="w-full border rounded-md p-3 min-h-[120px] text-sm" {...register('caption')} placeholder="Texto del post o pega contenido de ChatGPT..." />
+              <textarea className="w-full border rounded-md p-3 min-h-[120px] text-sm" {...register('caption')} placeholder="Texto del post..." />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -263,10 +346,13 @@ export default function PostCreatorPage() {
               <div><Label>Precio</Label><Input {...register('price')} placeholder="$19.990" /></div>
             </div>
 
-            <div>
-              <Label>Hashtags (separados por coma)</Label>
-              <Input {...register('hashtags')} placeholder="ElPollon, PolloALaBrasa, Iquique" />
-            </div>
+            <HashtagEditor
+              value={watched.hashtags || ''}
+              onChange={(v) => setValue('hashtags', v)}
+              branchId={watched.branch_id}
+              onGenerateAI={generateHashtagsAI}
+              aiLoading={hashtagAiLoading}
+            />
 
             <div>
               <Label>Fecha y hora programada</Label>
@@ -277,27 +363,43 @@ export default function PostCreatorPage() {
               <Label className="font-semibold">Generación de imagen</Label>
               <div className="space-y-2">
                 <label className="flex items-start gap-2 cursor-pointer">
+                  <input type="radio" name="imageMode" checked={imageMode === 'gallery_pick'} onChange={() => setImageMode('gallery_pick')} className="mt-1" />
+                  <div>
+                    <span className="text-sm font-medium">Usar imagen de galería</span>
+                    <p className="text-xs text-gray-500">Elige 1 a 4 fotos de tu galería. Varias fotos se unen en un collage profesional.</p>
+                  </div>
+                </label>
+                <label className="flex items-start gap-2 cursor-pointer">
                   <input type="radio" name="imageMode" checked={imageMode === 'gallery_auto'} onChange={() => setImageMode('gallery_auto')} className="mt-1" />
                   <div>
-                    <span className="text-sm font-medium">Galería automática (recomendado)</span>
-                    <p className="text-xs text-gray-500">Busca en tu galería la foto que más coincide con el título y texto</p>
+                    <span className="text-sm font-medium">Galería automática</span>
+                    <p className="text-xs text-gray-500">La IA busca la foto que más coincide con el título</p>
                   </div>
                 </label>
                 <label className="flex items-start gap-2 cursor-pointer">
                   <input type="radio" name="imageMode" checked={imageMode === 'gallery_prompt'} onChange={() => setImageMode('gallery_prompt')} className="mt-1" />
                   <div>
                     <span className="text-sm font-medium">Galería + prompt creativo</span>
-                    <p className="text-xs text-gray-500">Usa foto de galería y la edita según tu instrucción (ej: sobre una mesa)</p>
+                    <p className="text-xs text-gray-500">Edita la foto con IA según tu instrucción</p>
                   </div>
                 </label>
                 <label className="flex items-start gap-2 cursor-pointer">
                   <input type="radio" name="imageMode" checked={imageMode === 'template'} onChange={() => setImageMode('template')} className="mt-1" />
                   <div>
                     <span className="text-sm font-medium">Solo plantilla HTML</span>
-                    <p className="text-xs text-gray-500">Diseño gráfico sin foto real de galería</p>
+                    <p className="text-xs text-gray-500">Diseño gráfico sin foto real</p>
                   </div>
                 </label>
               </div>
+
+              {imageMode === 'gallery_pick' && (
+                <GallerySelectionBar
+                  selected={selectedGallery}
+                  onRemove={removeGalleryItem}
+                  returnPath={returnPath}
+                />
+              )}
+
               {imageMode === 'gallery_prompt' && aiHint && (
                 <div className="text-xs bg-red-50 border border-red-300 rounded-lg p-3 text-red-800">
                   <strong>Problema con la API:</strong> {aiHint}
@@ -305,15 +407,14 @@ export default function PostCreatorPage() {
               )}
               {imageMode === 'gallery_prompt' && !aiHint && openAiReady === false && (
                 <div className="text-xs bg-amber-50 border border-amber-300 rounded-lg p-3 text-amber-900">
-                  <strong>IA avanzada no configurada.</strong> Agrega <code className="bg-amber-100 px-1 rounded">GEMINI_API_KEY</code> gratis en Vercel (recomendado) o <code className="bg-amber-100 px-1 rounded">OPENAI_API_KEY</code> de pago.
+                  <strong>IA avanzada no configurada.</strong> Agrega GEMINI_API_KEY gratis en Vercel.
                 </div>
               )}
               {imageMode === 'gallery_prompt' && openAiReady === true && (
                 <div className="text-xs bg-blue-50 border border-blue-200 rounded-lg p-3 text-blue-800">
                   <strong>IA avanzada activa</strong>
                   {aiProvider === 'gemini' && ' (Google Gemini — gratis)'}
-                  {aiProvider === 'openai' && ' (OpenAI — de pago)'}
-                  . Edita la foto según tu prompt (como Gemini en chat).
+                  . Edita la foto según tu prompt.
                 </div>
               )}
               {imageMode === 'gallery_prompt' && (
@@ -323,7 +424,7 @@ export default function PostCreatorPage() {
                     className="w-full border rounded-md p-2 text-sm min-h-[80px] mt-1"
                     value={imagePrompt}
                     onChange={(e) => setImagePrompt(e.target.value)}
-                    placeholder="Ej: Ofertón familiar encima de una mesa de madera en restaurante, iluminación cálida..."
+                    placeholder="Ej: Ofertón sobre mesa de madera, fondo blanco, presentación profesional..."
                   />
                 </div>
               )}
@@ -336,20 +437,26 @@ export default function PostCreatorPage() {
               </Button>
             </div>
 
-            {lastMatch?.galleryItem && (
+            {(lastMatch?.galleryItem || lastMatch?.galleryItems?.length) && (
               <div className="text-xs bg-green-50 border border-green-200 rounded-lg p-3 text-green-800">
-                <strong>Foto usada:</strong> {lastMatch.galleryItem.title}
-                {lastMatch.matchReason && <span className="block text-green-600 mt-1">Coincidencia: {lastMatch.matchReason}</span>}
+                {lastMatch.galleryItems && lastMatch.galleryItems.length > 1 ? (
+                  <strong>{lastMatch.galleryItems.length} fotos usadas:</strong>
+                ) : (
+                  <strong>Foto usada:</strong>
+                )}
+                {' '}
+                {(lastMatch.galleryItems || (lastMatch.galleryItem ? [lastMatch.galleryItem] : []))
+                  .map((g) => g.title)
+                  .join(', ')}
+                {lastMatch.matchReason && <span className="block text-green-600 mt-1">{lastMatch.matchReason}</span>}
                 {lastMatch.aiSource === 'gemini' && (
                   <span className="block text-green-700 mt-1 font-medium">✓ Generado con Google Gemini (gratis)</span>
                 )}
-                {lastMatch.aiSource === 'openai' && (
-                  <span className="block text-green-700 mt-1 font-medium">✓ Generado con OpenAI (de pago)</span>
+                {lastMatch.aiSource === 'collage' && (
+                  <span className="block text-green-700 mt-1 font-medium">✓ Collage profesional de {lastMatch.galleryItems?.length} fotos</span>
                 )}
                 {lastMatch.aiSource === 'composer' && (
-                  <span className="block text-amber-700 mt-1">
-                    {lastMatch.aiWarning || 'Compositor básico. Configura GEMINI_API_KEY válida (AIzaSy... o AQ....) en Vercel.'}
-                  </span>
+                  <span className="block text-amber-700 mt-1">{lastMatch.aiWarning || 'Compositor básico.'}</span>
                 )}
               </div>
             )}
@@ -374,6 +481,7 @@ export default function PostCreatorPage() {
                 title={watched.title || 'Título'}
                 caption={watched.caption || ''}
                 imageUrl={imageUrl}
+                imageUrls={mediaUrls.length > 1 ? mediaUrls : undefined}
                 hashtags={watched.hashtags?.split(',').map((h) => h.trim())}
               />
             </CardContent>

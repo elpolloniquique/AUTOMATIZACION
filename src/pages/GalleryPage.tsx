@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { apiFetch } from '@/lib/utils';
@@ -9,19 +10,15 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import type { Branch, MediaGalleryItem, PostType } from '@/types';
 import { POST_TYPE_LABELS } from '@/types';
-import { Upload, Link2, Trash2, Pencil, ImageIcon, X } from 'lucide-react';
-
-const GALLERY_BUCKET = 'media-gallery';
-
-const emptyForm = {
-  title: '',
-  description: '',
-  tags: '',
-  dish_type: '' as PostType | '',
-  branch_id: '',
-};
+import { Upload, Link2, Trash2, Pencil, ImageIcon, X, Check, ArrowLeft } from 'lucide-react';
 
 export default function GalleryPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const selectMode = searchParams.get('select') === '1';
+  const maxSelect = Math.min(4, Math.max(1, parseInt(searchParams.get('max') || '4', 10)));
+  const returnPath = searchParams.get('return') || '/posts/new';
+
   const { profile, session } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [items, setItems] = useState<MediaGalleryItem[]>([]);
@@ -31,7 +28,18 @@ export default function GalleryPage() {
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState<MediaGalleryItem | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const GALLERY_BUCKET = 'media-gallery';
+
+  const emptyForm = {
+    title: '',
+    description: '',
+    tags: '',
+    dish_type: '' as PostType | '',
+    branch_id: '',
+  };
 
   useEffect(() => {
     supabase.from('branches').select('*').eq('is_active', true).then(({ data }) => {
@@ -181,8 +189,46 @@ export default function GalleryPage() {
     setShowForm(true);
   }
 
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= maxSelect) {
+        alert(`Máximo ${maxSelect} fotos por publicación`);
+        return prev;
+      }
+      return [...prev, id];
+    });
+  }
+
+  function confirmSelection() {
+    if (selectedIds.length === 0) return alert('Selecciona al menos 1 foto');
+    const selectedItems = selectedIds
+      .map((sid) => items.find((i) => i.id === sid))
+      .filter(Boolean) as MediaGalleryItem[];
+    navigate(returnPath, {
+      state: { selectedGalleryIds: selectedIds, selectedGalleryItems: selectedItems },
+    });
+  }
+
   return (
     <div className="space-y-6">
+      {selectMode && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold text-blue-900">Modo selección para publicación</p>
+            <p className="text-sm text-blue-700">Elige hasta {maxSelect} fotos. {selectedIds.length} seleccionada(s).</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate(returnPath)}>
+              <ArrowLeft className="w-4 h-4 mr-1" /> Volver
+            </Button>
+            <Button size="sm" onClick={confirmSelection} disabled={selectedIds.length === 0}>
+              <Check className="w-4 h-4 mr-1" /> Confirmar ({selectedIds.length})
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap justify-between items-start gap-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -193,9 +239,11 @@ export default function GalleryPage() {
             Sube fotos de tus platos. La IA las usará automáticamente al generar publicaciones.
           </p>
         </div>
-        <Button onClick={openNew}>
-          <Upload className="w-4 h-4 mr-1" /> Agregar foto
-        </Button>
+        {!selectMode && (
+          <Button onClick={openNew}>
+            <Upload className="w-4 h-4 mr-1" /> Agregar foto
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-4 items-end">
@@ -276,14 +324,29 @@ export default function GalleryPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {items.map((item) => (
-            <Card key={item.id} className="overflow-hidden group">
+          {items.map((item) => {
+            const isSelected = selectedIds.includes(item.id);
+            return (
+            <Card
+              key={item.id}
+              className={`overflow-hidden group cursor-pointer transition-all ${selectMode && isSelected ? 'ring-4 ring-pollon-red scale-[1.02]' : ''}`}
+              onClick={selectMode ? () => toggleSelect(item.id) : undefined}
+            >
               <div className="aspect-square relative bg-gray-100">
                 <img src={item.public_url} alt={item.title} className="w-full h-full object-cover" />
+                {selectMode && (
+                  <div className={`absolute top-2 right-2 w-7 h-7 rounded-full border-2 flex items-center justify-center ${
+                    isSelected ? 'bg-pollon-red border-pollon-red text-white' : 'bg-white/90 border-gray-300'
+                  }`}>
+                    {isSelected && <Check className="w-4 h-4" />}
+                  </div>
+                )}
+                {!selectMode && (
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => openEdit(item)}><Pencil className="w-3 h-3" /></Button>
-                  <Button size="sm" variant="destructive" onClick={() => deleteItem(item)}><Trash2 className="w-3 h-3" /></Button>
+                  <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(item); }}><Pencil className="w-3 h-3" /></Button>
+                  <Button size="sm" variant="destructive" onClick={(e) => { e.stopPropagation(); deleteItem(item); }}><Trash2 className="w-3 h-3" /></Button>
                 </div>
+                )}
               </div>
               <CardContent className="p-3">
                 <p className="font-semibold text-sm truncate">{item.title}</p>
@@ -295,7 +358,8 @@ export default function GalleryPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

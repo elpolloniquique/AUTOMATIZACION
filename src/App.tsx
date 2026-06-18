@@ -10,6 +10,7 @@ import TemplatesPage from '@/pages/TemplatesPage';
 import ApprovalsPage from '@/pages/ApprovalsPage';
 import SocialConfigPage from '@/pages/SocialConfigPage';
 import HistoryPage from '@/pages/HistoryPage';
+import TagsPage from '@/pages/TagsPage';
 import BranchesPage from '@/pages/BranchesPage';
 import UsersPage from '@/pages/UsersPage';
 import GalleryPage from '@/pages/GalleryPage';
@@ -56,6 +57,11 @@ function AppRoutes() {
       <Route path="/history" element={
         <ProtectedRoute>
           <DashboardLayout><HistoryPage /></DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/tags" element={
+        <ProtectedRoute>
+          <DashboardLayout><TagsPage /></DashboardLayout>
         </ProtectedRoute>
       } />
       <Route path="/branches" element={
