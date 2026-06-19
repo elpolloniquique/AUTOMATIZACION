@@ -15,6 +15,7 @@ import BranchesPage from '@/pages/BranchesPage';
 import UsersPage from '@/pages/UsersPage';
 import GalleryPage from '@/pages/GalleryPage';
 import FrameConfigPage from '@/pages/FrameConfigPage';
+import ScheduledStoriesPage from '@/pages/ScheduledStoriesPage';
 
 function AppRoutes() {
   return (
@@ -83,6 +84,11 @@ function AppRoutes() {
       <Route path="/gallery" element={
         <ProtectedRoute>
           <DashboardLayout><GalleryPage /></DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/stories" element={
+        <ProtectedRoute roles={['super_admin', 'admin_sucursal']}>
+          <DashboardLayout><ScheduledStoriesPage /></DashboardLayout>
         </ProtectedRoute>
       } />
       <Route path="*" element={<Navigate to="/" replace />} />

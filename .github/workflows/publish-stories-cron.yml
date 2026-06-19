@@ -1,0 +1,22 @@
+name: Publish Due Stories
+
+on:
+  schedule:
+    - cron: '3-58/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  publish-stories:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger story cron on Vercel
+        run: |
+          HTTP_CODE=$(curl -s -o /tmp/story_response.txt -w "%{http_code}" -X POST \
+            "${{ secrets.APP_URL }}/api/cron/publish-due-stories" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          echo "HTTP $HTTP_CODE"
+          cat /tmp/story_response.txt
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            exit 1
+          fi

@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Calendar, FileEdit,   LayoutTemplate, CheckCircle,
-  Share2, History, Building2, Users, LogOut, Menu, X, Images, Tag, Layers,
+  Share2, History, Building2, Users, LogOut, Menu, X, Images, Tag, Layers, BookImage,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,6 +16,7 @@ const navItems = [
   { to: '/tags', icon: Tag, label: 'Etiquetas' },
   { to: '/templates', icon: LayoutTemplate, label: 'Plantillas' },
   { to: '/frame-config', icon: Layers, label: 'Header y Footer', roles: ['super_admin', 'admin_sucursal'] },
+  { to: '/stories', icon: BookImage, label: 'Historias programadas', roles: ['super_admin', 'admin_sucursal'] },
   { to: '/approvals', icon: CheckCircle, label: 'Aprobaciones' },
   { to: '/social', icon: Share2, label: 'Redes sociales' },
   { to: '/history', icon: History, label: 'Historial' },

@@ -7,6 +7,12 @@ import { roleGuard, cronGuard } from './utils/roleGuard.js';
 import { asyncHandler } from './utils/asyncHandler.js';
 import { assertBranchAccess, getPostBranchId, HttpError } from './utils/branchAccess.js';
 import { publishDuePosts, publishSinglePost } from './jobs/publishDuePosts.js';
+import { publishDueStories } from './jobs/publishDueStories.js';
+import {
+  buildStoryPayload,
+  publishSingleStory,
+  type ScheduledStoryRow,
+} from './services/stories/scheduledStoryService.js';
 import { generateContent } from './services/ai/contentGenerator.js';
 import { AVAILABLE_TEMPLATES, listHtmlTemplateSlugs } from './services/image-generator/renderPostImage.js';
 import { generatePostImage, fetchGalleryItems, importGalleryFromUrl } from './services/gallery/galleryService.js';
@@ -76,6 +82,16 @@ app.post('/api/cron/publish-due-posts', cronGuard, asyncHandler(async (_req, res
 
 app.get('/api/cron/publish-due-posts', cronGuard, asyncHandler(async (_req, res) => {
   const result = await publishDuePosts();
+  res.json({ success: true, ...result });
+}));
+
+app.post('/api/cron/publish-due-stories', cronGuard, asyncHandler(async (_req, res) => {
+  const result = await publishDueStories();
+  res.json({ success: true, ...result });
+}));
+
+app.get('/api/cron/publish-due-stories', cronGuard, asyncHandler(async (_req, res) => {
+  const result = await publishDueStories();
   res.json({ success: true, ...result });
 }));
 
@@ -663,6 +679,117 @@ app.get('/api/dashboard/stats', authMiddleware, asyncHandler(async (req, res) =>
   };
 
   res.json(stats);
+}));
+
+const scheduledStorySchema = z.object({
+  branch_id: z.string().uuid(),
+  title: z.string().min(2),
+  image_url: z.string().url(),
+  gallery_item_id: z.string().uuid().optional().nullable(),
+  days_of_week: z.array(z.number().int().min(0).max(6)).min(1).optional(),
+  publish_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
+  timezone: z.string().optional(),
+  is_active: z.boolean().optional(),
+});
+
+app.get('/api/scheduled-stories', authMiddleware, asyncHandler(async (req, res) => {
+  const supabase = getSupabaseAdmin();
+  const branchId = req.query.branch_id as string | undefined;
+  if (branchId) assertBranchAccess(req.user!, branchId);
+
+  let query = supabase.from('scheduled_stories').select('*').order('publish_time');
+  if (req.user!.role !== 'super_admin') {
+    if (branchId) query = query.eq('branch_id', branchId);
+    else if (req.user!.branchId) query = query.eq('branch_id', req.user!.branchId);
+    else return res.json({ stories: [] });
+  } else if (branchId) {
+    query = query.eq('branch_id', branchId);
+  }
+
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ stories: data || [] });
+}));
+
+app.post('/api/scheduled-stories', authMiddleware, roleGuard('super_admin', 'admin_sucursal'), asyncHandler(async (req, res) => {
+  const parsed = scheduledStorySchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: zodErrorMessage(parsed) });
+  assertBranchAccess(req.user!, parsed.data.branch_id);
+
+  const supabase = getSupabaseAdmin();
+  const payload = buildStoryPayload(parsed.data, req.user!.id);
+  const { data, error } = await supabase.from('scheduled_stories').insert(payload).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ story: data });
+}));
+
+app.put('/api/scheduled-stories/:id', authMiddleware, roleGuard('super_admin', 'admin_sucursal'), asyncHandler(async (req, res) => {
+  const parsed = scheduledStorySchema.partial().extend({
+    title: z.string().min(2).optional(),
+    image_url: z.string().url().optional(),
+    branch_id: z.string().uuid().optional(),
+  }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: zodErrorMessage(parsed) });
+
+  const supabase = getSupabaseAdmin();
+  const id = String(req.params.id);
+  const { data: existing } = await supabase.from('scheduled_stories').select('*').eq('id', id).single();
+  if (!existing) return res.status(404).json({ error: 'Historia programada no encontrada' });
+  assertBranchAccess(req.user!, existing.branch_id);
+  if (parsed.data.branch_id) assertBranchAccess(req.user!, parsed.data.branch_id);
+
+  const payload = buildStoryPayload({ ...existing, ...parsed.data }, req.user!.id);
+  const { data, error } = await supabase.from('scheduled_stories').update(payload).eq('id', id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ story: data });
+}));
+
+app.delete('/api/scheduled-stories/:id', authMiddleware, roleGuard('super_admin', 'admin_sucursal'), asyncHandler(async (req, res) => {
+  const supabase = getSupabaseAdmin();
+  const id = String(req.params.id);
+  const { data: existing } = await supabase.from('scheduled_stories').select('branch_id').eq('id', id).single();
+  if (!existing) return res.status(404).json({ error: 'Historia programada no encontrada' });
+  assertBranchAccess(req.user!, existing.branch_id);
+
+  const { error } = await supabase.from('scheduled_stories').update({ is_active: false, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+}));
+
+app.post('/api/scheduled-stories/:id/publish-now', authMiddleware, roleGuard('super_admin', 'admin_sucursal'), asyncHandler(async (req, res) => {
+  const supabase = getSupabaseAdmin();
+  const id = String(req.params.id);
+  const { data: story } = await supabase.from('scheduled_stories').select('*').eq('id', id).single();
+  if (!story) return res.status(404).json({ error: 'Historia programada no encontrada' });
+  assertBranchAccess(req.user!, story.branch_id);
+
+  const result = await publishSingleStory(story as ScheduledStoryRow, true);
+  if (!result.success) return res.status(500).json({ error: result.error || 'Error al publicar' });
+  res.json({ success: true, external_story_id: result.externalStoryId });
+}));
+
+app.get('/api/story-publications', authMiddleware, asyncHandler(async (req, res) => {
+  const supabase = getSupabaseAdmin();
+  const branchId = req.query.branch_id as string | undefined;
+  if (branchId) assertBranchAccess(req.user!, branchId);
+
+  let query = supabase
+    .from('story_publications')
+    .select('*, scheduled_stories(title)')
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (req.user!.role !== 'super_admin') {
+    if (branchId) query = query.eq('branch_id', branchId);
+    else if (req.user!.branchId) query = query.eq('branch_id', req.user!.branchId);
+    else return res.json({ publications: [] });
+  } else if (branchId) {
+    query = query.eq('branch_id', branchId);
+  }
+
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ publications: data || [] });
 }));
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

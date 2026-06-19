@@ -100,6 +100,38 @@ export interface SocialAccount {
   created_at: string;
 }
 
+export interface ScheduledStory {
+  id: string;
+  branch_id: string;
+  created_by: string | null;
+  title: string;
+  image_url: string;
+  gallery_item_id: string | null;
+  days_of_week: number[];
+  publish_time: string;
+  timezone: string;
+  is_active: boolean;
+  last_published_at: string | null;
+  last_publish_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StoryPublication {
+  id: string;
+  scheduled_story_id: string | null;
+  branch_id: string;
+  title: string | null;
+  image_url: string;
+  status: 'success' | 'failed' | 'pending';
+  external_story_id: string | null;
+  story_url: string | null;
+  error_message: string | null;
+  published_at: string | null;
+  created_at: string;
+  scheduled_stories?: { title: string } | null;
+}
+
 export interface PostTemplate {
   id: string;
   name: string;
