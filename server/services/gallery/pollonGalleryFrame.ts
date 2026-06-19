@@ -3,7 +3,8 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import sharp from 'sharp';
 import axios from 'axios';
-import { POLLON_BRAND } from '../../constants/pollonBrand.js';
+import { defaultFrameConfig, type FrameConfig } from './frameConfigService.js';
+import { fitTextToWidth, textToSvgPath } from './frameTextRenderer.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -21,6 +22,7 @@ export interface FrameComposeInput {
   photoBuffers: Buffer[];
   brandColor?: string;
   logoUrl?: string;
+  frameConfig?: FrameConfig;
 }
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -68,14 +70,6 @@ function svgBuffer(body: string): Buffer {
   return Buffer.from(xml, 'utf8');
 }
 
-function escapeXml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, '');
-}
 
 async function rasterizeSvg(body: string, width: number, height: number): Promise<Buffer> {
   return sharp(svgBuffer(body), { density: 144 })
@@ -143,8 +137,8 @@ export async function extractSmartAccentColor(photoBuffers: Buffer[], brandFallb
   return safeHexColor(accent);
 }
 
-function buildCornerHeaderSvg(accent: string): string {
-  const { size, cornerSize } = FRAME;
+function buildCornerHeaderSvg(accent: string, cornerSize: number): string {
+  const { size } = FRAME;
   const color = safeHexColor(accent);
   return `
     <svg width="${size}" height="${cornerSize}" xmlns="http://www.w3.org/2000/svg">
@@ -152,43 +146,73 @@ function buildCornerHeaderSvg(accent: string): string {
     </svg>`;
 }
 
-function buildFooterSvg(accent: string, hasFooterLogo = false): string {
-  const { size, footerH } = FRAME;
-  const color = safeHexColor(accent);
-  const phone = escapeXml('+56 9 86925310');
-  const web = escapeXml(POLLON_BRAND.websiteDisplay.replace(/[^\x20-\x7E]/g, '') || 'www.el-pollon.cl');
+async function buildFooterSvg(
+  accent: string,
+  cfg: FrameConfig,
+  hasFooterLogo: boolean,
+): Promise<string> {
+  const { size } = FRAME;
+  const footerH = cfg.footerHeight;
+  const color = safeHexColor(cfg.footerBgColor || accent);
+  const textColor = safeHexColor(cfg.textColor);
+  const ctaColor = safeHexColor(cfg.ctaTextColor || accent);
+  const waColor = safeHexColor(cfg.whatsappIconColor);
+  const webColor = safeHexColor(cfg.websiteIconColor);
+  const ctaBg = safeHexColor(cfg.ctaBgColor);
+
   const btnY = Math.round(footerH / 2 - 30);
   const btnX = Math.round(size / 2 - 152);
   const rowY = Math.round(footerH / 2 - 20);
-  const rowX = hasFooterLogo ? 72 : 20;
+  const rowX = hasFooterLogo && cfg.showFooterLogo ? 72 : 20;
   const webX = size - 290;
 
-  return `
-    <svg width="${size}" height="${footerH}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="${size}" height="${footerH}" fill="${color}"/>
+  const parts: string[] = [
+    `<svg width="${size}" height="${footerH}" xmlns="http://www.w3.org/2000/svg">`,
+    `<rect width="${size}" height="${footerH}" fill="${color}"/>`,
+  ];
+
+  if (cfg.showWhatsapp) {
+    const phoneFit = await fitTextToWidth(cfg.whatsappDisplay, 200, 22);
+    const phonePath = await textToSvgPath(phoneFit.text, { x: 50, y: 27, fontSize: phoneFit.fontSize });
+    parts.push(`
       <g transform="translate(${rowX}, ${rowY})">
-        <circle cx="20" cy="20" r="20" fill="#25D366"/>
+        <circle cx="20" cy="20" r="20" fill="${waColor}"/>
         <path fill="#ffffff" d="M20 10a10 10 0 00-10 10c0 1.8.5 3.5 1.4 5l-1.3 4.7 4.8-1.3a10 10 0 0014.1-9.4A10 10 0 0020 10z"/>
-        <text x="50" y="27" fill="#ffffff" font-family="Arial,sans-serif" font-size="22" font-weight="700">${phone}</text>
-      </g>
+        <path d="${phonePath}" fill="${textColor}"/>
+      </g>`);
+  }
+
+  if (cfg.showCta) {
+    const ctaFit = await fitTextToWidth(cfg.ctaText, 200, 20);
+    const ctaPath = await textToSvgPath(ctaFit.text, { x: 168, y: 38, fontSize: ctaFit.fontSize, anchor: 'middle' });
+    parts.push(`
       <g transform="translate(${btnX}, ${btnY})">
-        <rect width="304" height="60" rx="30" fill="#ffffff"/>
-        <circle cx="34" cy="30" r="16" fill="${color}"/>
+        <rect width="304" height="60" rx="30" fill="${ctaBg}"/>
+        <circle cx="34" cy="30" r="16" fill="${ctaColor}"/>
         <path fill="#ffffff" d="M28 36h2l1-3h4l1 3h2l-3-9h-4l-3 9zm4-11a2 2 0 110 4 2 2 0 010-4z"/>
         <circle cx="42" cy="36" r="3" fill="#ffffff"/>
         <circle cx="26" cy="36" r="3" fill="#ffffff"/>
-        <text x="168" y="38" text-anchor="middle" fill="${color}" font-family="Arial,sans-serif" font-size="20" font-weight="900">PIDE AHORA!</text>
-      </g>
+        <path d="${ctaPath}" fill="${ctaColor}"/>
+      </g>`);
+  }
+
+  if (cfg.showWebsite) {
+    const webFit = await fitTextToWidth(cfg.websiteDisplay, 180, 18);
+    const webPath = await textToSvgPath(webFit.text, { x: 48, y: 27, fontSize: webFit.fontSize });
+    parts.push(`
       <g transform="translate(${webX}, ${rowY})">
-        <circle cx="20" cy="20" r="18" fill="#4A7FD6"/>
+        <circle cx="20" cy="20" r="18" fill="${webColor}"/>
         <circle cx="20" cy="20" r="11" fill="none" stroke="#ffffff" stroke-width="2"/>
         <line x1="20" y1="9" x2="20" y2="12" stroke="#ffffff" stroke-width="2"/>
         <line x1="20" y1="28" x2="20" y2="31" stroke="#ffffff" stroke-width="2"/>
         <line x1="9" y1="20" x2="12" y2="20" stroke="#ffffff" stroke-width="2"/>
         <line x1="28" y1="20" x2="31" y2="20" stroke="#ffffff" stroke-width="2"/>
-        <text x="48" y="27" fill="#ffffff" font-family="Arial,sans-serif" font-size="18" font-weight="600">${web}</text>
-      </g>
-    </svg>`;
+        <path d="${webPath}" fill="${textColor}"/>
+      </g>`);
+  }
+
+  parts.push('</svg>');
+  return parts.join('\n');
 }
 
 function buildBottomFadeSvg(accent: string, width: number, height: number): string {
@@ -206,14 +230,14 @@ function buildBottomFadeSvg(accent: string, width: number, height: number): stri
 }
 
 async function buildDefaultLogoPng(size: number): Promise<Buffer> {
+  const epPath = await textToSvgPath('EP', { x: size / 2, y: size / 2 + 8, fontSize: Math.round(size * 0.22), anchor: 'middle' });
+  const namePath = await textToSvgPath('El Pollon', { x: size / 2, y: size / 2 + 36, fontSize: Math.round(size * 0.09), anchor: 'middle' });
   const svg = `
     <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
       <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 2}" fill="#ffffff"/>
       <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 10}" fill="#c50000"/>
-      <text x="${size / 2}" y="${size / 2 - 4}" text-anchor="middle" fill="#f5a623"
-        font-family="Arial,sans-serif" font-size="${Math.round(size * 0.22)}" font-weight="bold">EP</text>
-      <text x="${size / 2}" y="${size / 2 + 28}" text-anchor="middle" fill="#ffffff"
-        font-family="Arial,sans-serif" font-size="${Math.round(size * 0.09)}" font-weight="600">El Pollon</text>
+      <path d="${epPath}" fill="#f5a623"/>
+      <path d="${namePath}" fill="#ffffff"/>
     </svg>`;
   return rasterizeSvg(svg, size, size);
 }
@@ -330,13 +354,15 @@ function computePhotoGrid(count: number, areaW: number, areaH: number, gap: numb
 }
 
 export async function composePollonGalleryFrame(input: FrameComposeInput): Promise<Buffer> {
-  const { size, footerH } = FRAME;
+  const cfg = input.frameConfig || defaultFrameConfig();
+  const { size } = FRAME;
+  const footerH = cfg.footerHeight;
   const contentH = size - footerH;
   const gap = 8;
   const photos = input.photoBuffers.slice(0, 4);
   if (photos.length === 0) throw new Error('Se requiere al menos una foto');
 
-  const brandFallback = input.brandColor || FRAME.defaultAccent;
+  const brandFallback = cfg.accentColor || input.brandColor || FRAME.defaultAccent;
   const accent = await extractSmartAccentColor(photos, brandFallback);
 
   const cells = computePhotoGrid(photos.length, size, contentH, gap);
@@ -365,13 +391,20 @@ export async function composePollonGalleryFrame(input: FrameComposeInput): Promi
     .toBuffer();
 
   const fadeH = 48;
+  const showFooterLogo = cfg.showFooterLogo;
   const [logo, footerLogo] = await Promise.all([
-    prepareCircularLogo(input.logoUrl),
-    prepareFooterLogo(input.logoUrl),
+    cfg.showHeaderLogo ? prepareCircularLogo(input.logoUrl) : Promise.resolve(null),
+    showFooterLogo ? prepareFooterLogo(input.logoUrl) : Promise.resolve(null),
   ]);
+
+  const footerSvg = await buildFooterSvg(accent, cfg, Boolean(footerLogo));
+  const cornerSize = cfg.headerStyle === 'minimal' ? 0 : cfg.cornerSize;
+
   const [footer, corner, fade] = await Promise.all([
-    rasterizeSvg(buildFooterSvg(accent, Boolean(footerLogo)), size, footerH),
-    rasterizeSvg(buildCornerHeaderSvg(accent), size, FRAME.cornerSize),
+    rasterizeSvg(footerSvg, size, footerH),
+    cornerSize > 0
+      ? rasterizeSvg(buildCornerHeaderSvg(accent, cornerSize), size, cornerSize)
+      : Promise.resolve(null),
     rasterizeSvg(buildBottomFadeSvg(accent, size, fadeH), size, fadeH),
   ]);
 
@@ -379,9 +412,10 @@ export async function composePollonGalleryFrame(input: FrameComposeInput): Promi
     { input: contentLayer, top: 0, left: 0 },
     { input: fade, top: contentH - fadeH, left: 0 },
     { input: footer, top: contentH, left: 0 },
-    { input: corner, top: 0, left: 0 },
-    { input: logo, top: FRAME.logoY, left: FRAME.logoX },
   ];
+
+  if (corner) composites.push({ input: corner, top: 0, left: 0 });
+  if (logo) composites.push({ input: logo, top: FRAME.logoY, left: FRAME.logoX });
 
   if (footerLogo) {
     composites.push({
@@ -396,5 +430,54 @@ export async function composePollonGalleryFrame(input: FrameComposeInput): Promi
   })
     .composite(composites)
     .png({ quality: 94 })
+    .toBuffer();
+}
+
+/** Preview del header/footer para la UI de configuracion */
+export async function composeFramePreview(cfg: FrameConfig, brandColor?: string, logoUrl?: string): Promise<Buffer> {
+  const accent = safeHexColor(cfg.accentColor || brandColor || FRAME.defaultAccent);
+  const footerH = cfg.footerHeight;
+  const size = FRAME.size;
+  const previewH = 400;
+  const contentH = previewH - footerH;
+
+  const placeholder = await sharp({
+    create: { width: size, height: contentH, channels: 3, background: { r: 50, g: 50, b: 50 } },
+  }).png().toBuffer();
+
+  const footerLogo = cfg.showFooterLogo ? await prepareFooterLogo(logoUrl) : null;
+  const footerSvg = await buildFooterSvg(accent, cfg, Boolean(footerLogo));
+  const cornerSize = cfg.headerStyle === 'minimal' ? 0 : Math.min(cfg.cornerSize, 200);
+
+  const [footer, corner] = await Promise.all([
+    rasterizeSvg(footerSvg, size, footerH),
+    cornerSize > 0
+      ? rasterizeSvg(buildCornerHeaderSvg(accent, cornerSize), size, cornerSize)
+      : Promise.resolve(null),
+  ]);
+
+  const composites: sharp.OverlayOptions[] = [
+    { input: placeholder, top: 0, left: 0 },
+    { input: footer, top: contentH, left: 0 },
+  ];
+  if (corner) composites.push({ input: corner, top: 0, left: 0 });
+  if (cfg.showHeaderLogo) {
+    const logo = await prepareCircularLogo(logoUrl);
+    composites.push({ input: logo, top: 20, left: 24 });
+  }
+  if (footerLogo) {
+    composites.push({
+      input: footerLogo,
+      top: contentH + Math.round((footerH - 52) / 2),
+      left: 8,
+    });
+  }
+
+  return sharp({
+    create: { width: size, height: previewH, channels: 3, background: { r: 30, g: 30, b: 30 } },
+  })
+    .composite(composites)
+    .resize(540, Math.round(previewH / 2))
+    .png()
     .toBuffer();
 }

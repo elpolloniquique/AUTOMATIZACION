@@ -41,8 +41,41 @@ export interface Branch {
   opening_hours: string | null;
   logo_url: string | null;
   brand_color: string;
+  website: string | null;
+  frame_template_id: string | null;
   is_active: boolean;
   created_at: string;
+}
+
+export interface BrandFrameTemplate {
+  id: string;
+  branch_id: string | null;
+  name: string;
+  description: string | null;
+  is_default: boolean;
+  is_active: boolean;
+  header_style: 'corner' | 'bar' | 'minimal';
+  header_show_logo: boolean;
+  header_corner_size: number;
+  footer_whatsapp: string | null;
+  footer_whatsapp_display: string | null;
+  footer_website: string | null;
+  footer_website_display: string | null;
+  footer_cta_text: string;
+  footer_show_whatsapp: boolean;
+  footer_show_website: boolean;
+  footer_show_cta: boolean;
+  footer_show_footer_logo: boolean;
+  footer_height: number;
+  accent_color: string | null;
+  footer_bg_color: string | null;
+  cta_bg_color: string | null;
+  cta_text_color: string | null;
+  whatsapp_icon_color: string | null;
+  website_icon_color: string | null;
+  text_color: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface SocialAccount {

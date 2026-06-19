@@ -14,6 +14,7 @@ import TagsPage from '@/pages/TagsPage';
 import BranchesPage from '@/pages/BranchesPage';
 import UsersPage from '@/pages/UsersPage';
 import GalleryPage from '@/pages/GalleryPage';
+import FrameConfigPage from '@/pages/FrameConfigPage';
 
 function AppRoutes() {
   return (
@@ -72,6 +73,11 @@ function AppRoutes() {
       <Route path="/users" element={
         <ProtectedRoute roles={['super_admin']}>
           <DashboardLayout><UsersPage /></DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/frame-config" element={
+        <ProtectedRoute roles={['super_admin', 'admin_sucursal']}>
+          <DashboardLayout><FrameConfigPage /></DashboardLayout>
         </ProtectedRoute>
       } />
       <Route path="/gallery" element={

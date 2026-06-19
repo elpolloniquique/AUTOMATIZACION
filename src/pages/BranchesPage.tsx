@@ -16,6 +16,7 @@ const emptyBranch = {
   address: '',
   phone: '',
   whatsapp: '',
+  website: '',
   opening_hours: '',
   brand_color: '#c50000',
   logo_url: null as string | null,
@@ -28,6 +29,7 @@ function buildPayload(editing: Partial<Branch>) {
     address: editing.address?.trim() || null,
     phone: editing.phone?.trim() || null,
     whatsapp: editing.whatsapp?.trim() || null,
+    website: editing.website?.trim() || null,
     opening_hours: editing.opening_hours?.trim() || null,
     brand_color: editing.brand_color || '#c50000',
     logo_url: editing.logo_url || null,
@@ -210,6 +212,10 @@ export default function BranchesPage() {
               <div>
                 <Label>WhatsApp</Label>
                 <Input value={editing.whatsapp || ''} onChange={(e) => setEditing({ ...editing, whatsapp: e.target.value })} placeholder="+56986925310" />
+              </div>
+              <div>
+                <Label>Pagina web</Label>
+                <Input value={editing.website || ''} onChange={(e) => setEditing({ ...editing, website: e.target.value })} placeholder="www.el-pollon.cl" />
               </div>
               <div>
                 <Label>Horario</Label>

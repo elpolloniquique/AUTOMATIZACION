@@ -18,6 +18,12 @@ import { testGoogleBusinessConnection } from './services/google-business/googleB
 import { generateTikTokScript } from './services/tiktok/tiktokPublisher.js';
 import { getSupabaseAdmin } from './utils/supabase.js';
 import { saveAndSchedulePost, canAutoApprove, isPublishDue } from './services/posts/postScheduleService.js';
+import {
+  buildTemplatePayload,
+  resolveFrameConfig,
+  templateRowToConfig,
+} from './services/gallery/frameConfigService.js';
+import { composeFramePreview } from './services/gallery/pollonGalleryFrame.js';
 import { z } from 'zod';
 
 function zodErrorMessage(result: z.SafeParseError<unknown>) {
@@ -228,6 +234,175 @@ app.get('/api/images/templates', authMiddleware, (_req, res) => {
 app.get('/api/templates/html-slugs', authMiddleware, asyncHandler(async (_req, res) => {
   const slugs = await listHtmlTemplateSlugs();
   res.json({ slugs });
+}));
+
+const frameTemplateSchema = z.object({
+  branch_id: z.string().uuid().nullable().optional(),
+  name: z.string().min(2),
+  description: z.string().optional().nullable(),
+  is_default: z.boolean().optional(),
+  is_active: z.boolean().optional(),
+  header_style: z.enum(['corner', 'bar', 'minimal']).optional(),
+  header_show_logo: z.boolean().optional(),
+  header_corner_size: z.number().int().min(100).max(500).optional(),
+  footer_whatsapp: z.string().optional().nullable(),
+  footer_whatsapp_display: z.string().optional().nullable(),
+  footer_website: z.string().optional().nullable(),
+  footer_website_display: z.string().optional().nullable(),
+  footer_cta_text: z.string().optional(),
+  footer_show_whatsapp: z.boolean().optional(),
+  footer_show_website: z.boolean().optional(),
+  footer_show_cta: z.boolean().optional(),
+  footer_show_footer_logo: z.boolean().optional(),
+  footer_height: z.number().int().min(80).max(200).optional(),
+  accent_color: z.string().optional().nullable(),
+  footer_bg_color: z.string().optional().nullable(),
+  cta_bg_color: z.string().optional().nullable(),
+  cta_text_color: z.string().optional().nullable(),
+  whatsapp_icon_color: z.string().optional().nullable(),
+  website_icon_color: z.string().optional().nullable(),
+  text_color: z.string().optional().nullable(),
+});
+
+app.get('/api/frame-templates', authMiddleware, asyncHandler(async (req, res) => {
+  const supabase = getSupabaseAdmin();
+  const branchId = req.query.branch_id as string | undefined;
+  if (branchId) assertBranchAccess(req.user!, branchId);
+
+  let query = supabase.from('brand_frame_templates').select('*').eq('is_active', true).order('name');
+  if (req.user!.role !== 'super_admin') {
+    if (branchId) {
+      query = query.or(`branch_id.eq.${branchId},branch_id.is.null`);
+    } else if (req.user!.branchId) {
+      query = query.or(`branch_id.eq.${req.user!.branchId},branch_id.is.null`);
+    } else {
+      query = query.is('branch_id', null);
+    }
+  } else if (branchId) {
+    query = query.or(`branch_id.eq.${branchId},branch_id.is.null`);
+  }
+
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ templates: data || [] });
+}));
+
+app.post('/api/frame-templates/preview', authMiddleware, asyncHandler(async (req, res) => {
+  const parsed = frameTemplateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: zodErrorMessage(parsed) });
+
+  const branchId = parsed.data.branch_id || undefined;
+  if (branchId) assertBranchAccess(req.user!, branchId);
+
+  let logoUrl: string | undefined;
+  let brandColor: string | undefined;
+  if (branchId) {
+    const supabase = getSupabaseAdmin();
+    const { data: branch } = await supabase.from('branches').select('logo_url, brand_color').eq('id', branchId).single();
+    logoUrl = branch?.logo_url || undefined;
+    brandColor = branch?.brand_color || undefined;
+  }
+
+  const cfg = templateRowToConfig({
+    id: 'preview',
+    branch_id: branchId || null,
+    name: parsed.data.name,
+    description: parsed.data.description || null,
+    is_default: parsed.data.is_default ?? false,
+    is_active: true,
+    header_style: parsed.data.header_style || 'corner',
+    header_show_logo: parsed.data.header_show_logo ?? true,
+    header_corner_size: parsed.data.header_corner_size ?? 300,
+    footer_whatsapp: parsed.data.footer_whatsapp || null,
+    footer_whatsapp_display: parsed.data.footer_whatsapp_display || null,
+    footer_website: parsed.data.footer_website || null,
+    footer_website_display: parsed.data.footer_website_display || null,
+    footer_cta_text: parsed.data.footer_cta_text || 'PIDE AHORA!',
+    footer_show_whatsapp: parsed.data.footer_show_whatsapp ?? true,
+    footer_show_website: parsed.data.footer_show_website ?? true,
+    footer_show_cta: parsed.data.footer_show_cta ?? true,
+    footer_show_footer_logo: parsed.data.footer_show_footer_logo ?? true,
+    footer_height: parsed.data.footer_height ?? 118,
+    accent_color: parsed.data.accent_color || null,
+    footer_bg_color: parsed.data.footer_bg_color || null,
+    cta_bg_color: parsed.data.cta_bg_color || '#ffffff',
+    cta_text_color: parsed.data.cta_text_color || null,
+    whatsapp_icon_color: parsed.data.whatsapp_icon_color || '#25D366',
+    website_icon_color: parsed.data.website_icon_color || '#4A7FD6',
+    text_color: parsed.data.text_color || '#ffffff',
+    created_at: '',
+    updated_at: '',
+  }, null);
+  const buffer = await composeFramePreview(cfg, brandColor, logoUrl);
+  res.json({ preview: `data:image/png;base64,${buffer.toString('base64')}` });
+}));
+
+app.post('/api/frame-templates', authMiddleware, roleGuard('super_admin', 'admin_sucursal'), asyncHandler(async (req, res) => {
+  const parsed = frameTemplateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: zodErrorMessage(parsed) });
+
+  const branchId = parsed.data.branch_id || null;
+  if (branchId) assertBranchAccess(req.user!, branchId);
+  if (req.user!.role === 'admin_sucursal' && !branchId) {
+    return res.status(403).json({ error: 'Admin sucursal debe asignar una sucursal' });
+  }
+
+  const supabase = getSupabaseAdmin();
+  const payload = buildTemplatePayload(parsed.data);
+
+  if (payload.is_default) {
+    let clearQuery = supabase.from('brand_frame_templates').update({ is_default: false });
+    if (branchId) clearQuery = clearQuery.eq('branch_id', branchId);
+    else clearQuery = clearQuery.is('branch_id', null);
+    await clearQuery;
+  }
+
+  const { data, error } = await supabase.from('brand_frame_templates').insert(payload).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ template: data });
+}));
+
+app.put('/api/frame-templates/:id', authMiddleware, roleGuard('super_admin', 'admin_sucursal'), asyncHandler(async (req, res) => {
+  const parsed = frameTemplateSchema.partial().extend({ name: z.string().min(2).optional() }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: zodErrorMessage(parsed) });
+
+  const supabase = getSupabaseAdmin();
+  const id = String(req.params.id);
+  const { data: existing } = await supabase.from('brand_frame_templates').select('*').eq('id', id).single();
+  if (!existing) return res.status(404).json({ error: 'Plantilla no encontrada' });
+  if (existing.branch_id) assertBranchAccess(req.user!, existing.branch_id);
+
+  const payload = buildTemplatePayload({ ...existing, ...parsed.data });
+
+  if (payload.is_default) {
+    let clearQuery = supabase.from('brand_frame_templates').update({ is_default: false }).neq('id', id);
+    if (existing.branch_id) clearQuery = clearQuery.eq('branch_id', existing.branch_id);
+    else clearQuery = clearQuery.is('branch_id', null);
+    await clearQuery;
+  }
+
+  const { data, error } = await supabase.from('brand_frame_templates').update(payload).eq('id', id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ template: data });
+}));
+
+app.delete('/api/frame-templates/:id', authMiddleware, roleGuard('super_admin', 'admin_sucursal'), asyncHandler(async (req, res) => {
+  const supabase = getSupabaseAdmin();
+  const id = String(req.params.id);
+  const { data: existing } = await supabase.from('brand_frame_templates').select('branch_id').eq('id', id).single();
+  if (!existing) return res.status(404).json({ error: 'Plantilla no encontrada' });
+  if (existing.branch_id) assertBranchAccess(req.user!, existing.branch_id);
+
+  const { error } = await supabase.from('brand_frame_templates').update({ is_active: false }).eq('id', id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+}));
+
+app.get('/api/frame-templates/resolve/:branchId', authMiddleware, asyncHandler(async (req, res) => {
+  const branchId = String(req.params.branchId);
+  assertBranchAccess(req.user!, branchId);
+  const config = await resolveFrameConfig(branchId);
+  res.json({ config });
 }));
 
 app.get('/api/gallery/match', authMiddleware, asyncHandler(async (req, res) => {

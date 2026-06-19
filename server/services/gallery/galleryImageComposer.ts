@@ -2,6 +2,7 @@ import axios from 'axios';
 import sharp from 'sharp';
 import { config } from '../../config/index.js';
 import { composePollonGalleryFrame } from './pollonGalleryFrame.js';
+import { resolveFrameConfig } from './frameConfigService.js';
 
 interface SceneStyle {
   wallTop: string;
@@ -132,6 +133,7 @@ export interface MultiCollageOptions {
   price?: string;
   brandColor?: string;
   logoUrl?: string;
+  branchId?: string;
 }
 
 export async function addBrandOverlay(imageBuffer: Buffer, options: BrandOverlayOptions): Promise<Buffer> {
@@ -216,11 +218,13 @@ export async function composeMultiGalleryCollage(options: MultiCollageOptions): 
   if (urls.length === 0) throw new Error('Se requiere al menos una foto');
 
   const photoBuffers = await Promise.all(urls.map((url) => downloadImage(url)));
+  const frameConfig = await resolveFrameConfig(options.branchId);
 
   return composePollonGalleryFrame({
     photoBuffers,
     brandColor: options.brandColor,
     logoUrl: options.logoUrl,
+    frameConfig,
   });
 }
 
