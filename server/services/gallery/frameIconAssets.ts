@@ -98,3 +98,24 @@ export async function getSpeedBoltIcon(size: number): Promise<Buffer> {
   </svg>`;
   return rasterizeIcon('bolt', svg, size);
 }
+
+/** Globo blanco sobre circulo rojo — estilo HF02 */
+export async function getGlobeOnRedCircle(size: number, red = '#c50000'): Promise<Buffer> {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+    <circle cx="48" cy="48" r="44" fill="${red}"/>
+    <ellipse cx="48" cy="48" rx="26" ry="10" fill="none" stroke="#fff" stroke-width="2.2"/>
+    <ellipse cx="48" cy="48" rx="10" ry="26" fill="none" stroke="#fff" stroke-width="2.2"/>
+    <path d="M22 48h52M48 22v52" stroke="#fff" stroke-width="1.8" opacity="0.85"/>
+    <path fill="#fff" opacity="0.95" d="M34 40c2-4 7-7 12-7 2 0 4 0 5 1-2 1-3 3-4 5-3-1-6 0-13 1zm16 22c-4 2-9 3-13 1 1-2 3-3 6-4 1 2 4 3 7 3z"/>
+  </svg>`;
+  return rasterizeIcon(`globe-red-${red}`, svg, size);
+}
+
+/** Telefono blanco sobre circulo rojo — estilo HF02 */
+export async function getPhoneOnRedCircle(size: number, red = '#c50000'): Promise<Buffer> {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+    <circle cx="48" cy="48" r="44" fill="${red}"/>
+    <path fill="#fff" d="M58 22H38c-3.3 0-6 2.7-6 6v40c0 3.3 2.7 6 6 6h20c3.3 0 6-2.7 6-6V28c0-3.3-2.7-6-6-6zm-10 52c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4zm10-32H38V32h20v10z"/>
+  </svg>`;
+  return rasterizeIcon(`phone-red-${red}`, svg, size);
+}

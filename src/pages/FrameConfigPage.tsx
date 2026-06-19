@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import type { Branch, BrandFrameTemplate } from '@/types';
 import { Layers, Plus, Save, Trash2, Eye, Star, Copy } from 'lucide-react';
 
-const emptyTemplate = (): Partial<BrandFrameTemplate> => ({
+const emptyTemplateHf01 = (): Partial<BrandFrameTemplate> => ({
   name: 'Header y Footer 01',
   description: 'Diseño clásico con footer inteligente, tipografía grande y legible',
   layout_version: 'hf01',
@@ -39,6 +39,44 @@ const emptyTemplate = (): Partial<BrandFrameTemplate> => ({
   website_icon_color: '#4A7FD6',
   text_color: '#ffffff',
 });
+
+const emptyTemplateHf02 = (): Partial<BrandFrameTemplate> => ({
+  name: 'Header y Footer 02',
+  description: 'Logo centrado arriba, barra naranja inferior y botón ORDENA AHORA',
+  layout_version: 'hf02',
+  is_default: false,
+  header_style: 'minimal',
+  header_show_logo: true,
+  header_corner_size: 300,
+  footer_whatsapp_display: '+56 9 8692 5310',
+  footer_website_display: 'www.el-pollon.cl',
+  footer_cta_text: 'ORDENA AHORA!',
+  footer_show_whatsapp: true,
+  footer_show_website: true,
+  footer_show_cta: true,
+  footer_show_footer_logo: false,
+  footer_height: 130,
+  footer_adaptive_color: true,
+  footer_font_family: 'Roboto-Black',
+  footer_whatsapp_font_size: 26,
+  footer_website_font_size: 26,
+  footer_cta_font_size: 24,
+  footer_icon_size: 44,
+  accent_color: '#c50000',
+  footer_bg_color: '#F59E0B',
+  cta_bg_color: '#c50000',
+  cta_text_color: '#ffffff',
+  whatsapp_icon_color: '#c50000',
+  website_icon_color: '#c50000',
+  text_color: '#000000',
+  footer_whatsapp_text_color: '#000000',
+  footer_website_text_color: '#000000',
+});
+
+const LAYOUT_PRESETS: Record<string, () => Partial<BrandFrameTemplate>> = {
+  hf01: emptyTemplateHf01,
+  hf02: emptyTemplateHf02,
+};
 
 export default function FrameConfigPage() {
   const { session, profile } = useAuth();
@@ -170,8 +208,11 @@ export default function FrameConfigPage() {
               {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           </div>
-          <Button onClick={() => setEditing({ ...emptyTemplate(), branch_id: branchId || null })}>
-            <Plus className="w-4 h-4 mr-1" /> Nueva plantilla
+          <Button onClick={() => setEditing({ ...emptyTemplateHf01(), branch_id: branchId || null })}>
+            <Plus className="w-4 h-4 mr-1" /> HF01
+          </Button>
+          <Button variant="secondary" onClick={() => setEditing({ ...emptyTemplateHf02(), branch_id: branchId || null })}>
+            <Plus className="w-4 h-4 mr-1" /> HF02
           </Button>
         </div>
       </div>
@@ -232,6 +273,39 @@ export default function FrameConfigPage() {
                       <Eye className="w-8 h-8 opacity-30" />
                     </div>
                   )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle className="text-base">Diseño de plantilla</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label>Version header / footer</Label>
+                    <select
+                      className="w-full border rounded-md h-10 px-3"
+                      value={editing.layout_version || 'hf01'}
+                      onChange={(e) => {
+                        const layout = e.target.value;
+                        const preset = LAYOUT_PRESETS[layout]?.() || emptyTemplateHf01();
+                        setEditing({
+                          ...preset,
+                          ...editing,
+                          layout_version: layout,
+                          id: editing.id,
+                          branch_id: editing.branch_id,
+                          name: editing.id ? editing.name : preset.name,
+                        });
+                      }}
+                    >
+                      <option value="hf01">HF01 — Esquina roja clásica + WhatsApp</option>
+                      <option value="hf02">HF02 — Logo centrado + barra naranja</option>
+                    </select>
+                    {(editing.layout_version || 'hf01') === 'hf02' && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Logo centrado arriba, footer naranja inteligente, iconos web/teléfono en círculo rojo.
+                      </p>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -360,17 +434,24 @@ export default function FrameConfigPage() {
               <Card>
                 <CardHeader><CardTitle className="text-base">Header y colores</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
-                  <div>
-                    <Label>Estilo header</Label>
-                    <select
-                      className="w-full border rounded-md h-10 px-3"
-                      value={editing.header_style || 'corner'}
-                      onChange={(e) => setEditing({ ...editing, header_style: e.target.value as BrandFrameTemplate['header_style'] })}
-                    >
-                      <option value="corner">Esquina diagonal (clásico)</option>
-                      <option value="minimal">Sin esquina</option>
-                    </select>
-                  </div>
+                  {(editing.layout_version || 'hf01') === 'hf01' && (
+                    <div>
+                      <Label>Estilo header</Label>
+                      <select
+                        className="w-full border rounded-md h-10 px-3"
+                        value={editing.header_style || 'corner'}
+                        onChange={(e) => setEditing({ ...editing, header_style: e.target.value as BrandFrameTemplate['header_style'] })}
+                      >
+                        <option value="corner">Esquina diagonal (clásico)</option>
+                        <option value="minimal">Sin esquina</option>
+                      </select>
+                    </div>
+                  )}
+                  {(editing.layout_version || 'hf01') === 'hf02' && (
+                    <p className="text-sm text-gray-600 bg-orange-50 border border-orange-100 rounded-md p-3">
+                      HF02 usa logo centrado en franja blanca superior (200px). No aplica esquina diagonal.
+                    </p>
+                  )}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label>Color acento header</Label>

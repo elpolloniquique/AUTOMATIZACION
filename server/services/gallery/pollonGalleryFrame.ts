@@ -6,6 +6,7 @@ import axios from 'axios';
 import { defaultFrameConfig, type FrameConfig } from './frameConfigService.js';
 import { fitTextToWidth, measureTextWidth, textToSvgPath } from './frameTextRenderer.js';
 import { getDeliveryIcon, getGlobeIcon, getWhatsappIcon } from './frameIconAssets.js';
+import { composePollonGalleryFrameHf02, composeFramePreviewHf02 } from './pollonGalleryFrameHf02.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -362,7 +363,7 @@ async function prepareFooterLogo(logoUrl?: string): Promise<Buffer | null> {
   return prepareLogoBadge(raster, 52);
 }
 
-function computePhotoGrid(count: number, areaW: number, areaH: number, gap: number) {
+export function computePhotoGrid(count: number, areaW: number, areaH: number, gap: number) {
   const cells: Array<{ w: number; h: number; x: number; y: number }> = [];
   if (count === 1) {
     cells.push({ w: areaW, h: areaH, x: 0, y: 0 });
@@ -433,6 +434,11 @@ export async function composePollonGalleryFrame(input: FrameComposeInput): Promi
   }
 
   const cfg = input.frameConfig || defaultFrameConfig();
+
+  if (cfg.layoutVersion === 'hf02') {
+    return composePollonGalleryFrameHf02({ ...input, frameConfig: cfg, photoBuffers: photos });
+  }
+
   const { size } = FRAME;
   const footerH = cfg.footerHeight;
   const contentH = size - footerH;
@@ -509,6 +515,10 @@ export async function composePollonGalleryFrame(input: FrameComposeInput): Promi
 
 /** Preview del header/footer para la UI de configuracion */
 export async function composeFramePreview(cfg: FrameConfig, brandColor?: string, logoUrl?: string): Promise<Buffer> {
+  if (cfg.layoutVersion === 'hf02') {
+    return composeFramePreviewHf02(cfg, logoUrl);
+  }
+
   const size = FRAME.size;
   const footerH = cfg.footerHeight;
   const previewH = 400;

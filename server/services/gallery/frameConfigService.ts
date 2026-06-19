@@ -98,7 +98,38 @@ function parseFontFamily(raw: string | null | undefined): FooterFontFamily {
   return 'Roboto-Black';
 }
 
-export function defaultFrameConfig(): FrameConfig {
+export function defaultFrameConfig(layout: string = 'hf01'): FrameConfig {
+  if (layout === 'hf02') {
+    return {
+      layoutVersion: 'hf02',
+      whatsappDisplay: POLLON_BRAND.whatsappPhone,
+      websiteDisplay: POLLON_BRAND.websiteDisplay,
+      ctaText: 'ORDENA AHORA!',
+      showWhatsapp: true,
+      showWebsite: true,
+      showCta: true,
+      showFooterLogo: false,
+      showHeaderLogo: true,
+      footerHeight: 130,
+      headerStyle: 'minimal',
+      cornerSize: 300,
+      footerAdaptiveColor: true,
+      ctaBgColor: '#c50000',
+      ctaTextColor: '#ffffff',
+      whatsappIconColor: '#c50000',
+      websiteIconColor: '#c50000',
+      textColor: '#000000',
+      whatsappTextColor: '#000000',
+      websiteTextColor: '#000000',
+      footerBgColor: '#F59E0B',
+      footerFontFamily: 'Roboto-Black',
+      whatsappFontSize: 26,
+      websiteFontSize: 26,
+      ctaFontSize: 24,
+      footerIconSize: 44,
+    };
+  }
+
   return {
     layoutVersion: 'hf01',
     whatsappDisplay: POLLON_BRAND.whatsappPhone,
@@ -130,7 +161,8 @@ export function templateRowToConfig(
   template: FrameTemplateRow | null,
   branch?: { whatsapp?: string | null; website?: string | null; brand_color?: string | null } | null,
 ): FrameConfig {
-  const base = defaultFrameConfig();
+  const layout = template?.layout_version || 'hf01';
+  const base = defaultFrameConfig(layout);
 
   const whatsappRaw = template?.footer_whatsapp_display
     || template?.footer_whatsapp
@@ -252,7 +284,7 @@ export function buildTemplatePayload(body: Record<string, unknown>) {
     footer_show_website: body.footer_show_website !== false,
     footer_show_cta: body.footer_show_cta !== false,
     footer_show_footer_logo: body.footer_show_footer_logo !== false,
-    footer_height: Number(body.footer_height) || 132,
+    footer_height: Number(body.footer_height) || (body.layout_version === 'hf02' ? 130 : 132),
     footer_adaptive_color: body.footer_adaptive_color !== false,
     footer_font_family: body.footer_font_family || 'Roboto-Black',
     footer_whatsapp_font_size: Number(body.footer_whatsapp_font_size) || 28,

@@ -276,7 +276,7 @@ const frameTemplateSchema = z.object({
   footer_show_cta: z.boolean().optional(),
   footer_show_footer_logo: z.boolean().optional(),
   footer_height: z.number().int().min(80).max(200).optional(),
-  layout_version: z.string().optional(),
+  layout_version: z.enum(['hf01', 'hf02']).optional(),
   footer_adaptive_color: z.boolean().optional(),
   footer_font_family: z.enum(['Roboto-Bold', 'Roboto-Black']).optional(),
   footer_whatsapp_font_size: z.number().int().min(14).max(48).optional(),
