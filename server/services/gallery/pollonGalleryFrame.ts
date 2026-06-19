@@ -224,7 +224,7 @@ async function buildFooterHf01(
     const textW = await measureTextWidth(webFit.text, webFit.fontSize, fontFamily);
     const webIcon = await getGlobeIcon(iconSize);
     const blockW = iconSize + 14 + textW;
-    const blockX = size - blockW - 20;
+    const blockX = Math.round(size - blockW - 20);
 
     composites.push({
       input: webIcon,
