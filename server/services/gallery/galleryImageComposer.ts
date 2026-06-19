@@ -135,6 +135,7 @@ export interface MultiCollageOptions {
   logoUrl?: string;
   branchId?: string;
   frameTemplateId?: string | null;
+  useFrame?: boolean;
 }
 
 export async function addBrandOverlay(imageBuffer: Buffer, options: BrandOverlayOptions): Promise<Buffer> {
@@ -219,6 +220,11 @@ export async function composeMultiGalleryCollage(options: MultiCollageOptions): 
   if (urls.length === 0) throw new Error('Se requiere al menos una foto');
 
   const photoBuffers = await Promise.all(urls.map((url) => downloadImage(url)));
+
+  if (options.useFrame === false) {
+    return composePollonGalleryFrame({ photoBuffers, skipFrame: true });
+  }
+
   const frameConfig = await resolveFrameConfig(options.branchId, options.frameTemplateId);
 
   return composePollonGalleryFrame({

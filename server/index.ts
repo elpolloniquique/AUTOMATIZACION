@@ -195,6 +195,7 @@ app.post('/api/images/generate', authMiddleware, asyncHandler(async (req, res) =
     post_id: z.string().uuid().optional(),
     gallery_item_ids: z.array(z.string().uuid()).min(1).max(4).optional(),
     frame_template_id: z.string().uuid().optional().nullable(),
+    use_frame: z.boolean().optional(),
   });
 
   const parsed = schema.safeParse(req.body);
@@ -220,6 +221,7 @@ app.post('/api/images/generate', authMiddleware, asyncHandler(async (req, res) =
     postId: parsed.data.post_id,
     galleryItemIds: parsed.data.gallery_item_ids,
     frameTemplateId: parsed.data.frame_template_id,
+    useFrame: parsed.data.use_frame,
   });
   res.json(result);
 }));

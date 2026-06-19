@@ -24,6 +24,7 @@ export interface FrameComposeInput {
   brandColor?: string;
   logoUrl?: string;
   frameConfig?: FrameConfig;
+  skipFrame?: boolean;
 }
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -194,28 +195,30 @@ async function buildFooterHf01(
     const pillY = rowCenter - Math.round(pillH / 2);
     const ctaColor = safeHexColor(cfg.ctaTextColor || smartAccent);
     const ctaBg = safeHexColor(cfg.ctaBgColor);
+    const deliverySize = Math.round(iconSize * 0.72);
 
-    const deliveryIcon = await getDeliveryIcon(Math.round(iconSize * 0.82));
+    const pillSvg = `<svg width="${size}" height="${footerH}" xmlns="http://www.w3.org/2000/svg">
+      <rect x="${pillX}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillH / 2}" fill="${ctaBg}"/>
+    </svg>`;
+    composites.push({ input: await rasterizeSvg(pillSvg, size, footerH), top: 0, left: 0 });
+
+    const deliveryIcon = await getDeliveryIcon(deliverySize);
     composites.push({
       input: deliveryIcon,
-      top: pillY + Math.round((pillH - iconSize * 0.82) / 2),
-      left: pillX + 16,
+      top: pillY + Math.round((pillH - deliverySize) / 2),
+      left: pillX + 18,
     });
 
-    const ctaFit = await fitTextToWidth(cfg.ctaText, pillW - 90, cfg.ctaFontSize, fontFamily);
+    const ctaFit = await fitTextToWidth(cfg.ctaText, pillW - 100, cfg.ctaFontSize, fontFamily);
     const ctaPath = await textToSvgPath(ctaFit.text, {
-      x: pillX + pillW / 2 + 12,
+      x: pillX + pillW / 2 + 14,
       y: pillY + Math.round(pillH * 0.72),
       fontSize: ctaFit.fontSize,
       anchor: 'middle',
       fontFamily,
     });
-
-    const ctaSvg = `<svg width="${size}" height="${footerH}" xmlns="http://www.w3.org/2000/svg">
-      <rect x="${pillX}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillH / 2}" fill="${ctaBg}"/>
-      <path d="${ctaPath}" fill="${ctaColor}"/>
-    </svg>`;
-    composites.push({ input: await rasterizeSvg(ctaSvg, size, footerH), top: 0, left: 0 });
+    const ctaTextSvg = `<svg width="${size}" height="${footerH}" xmlns="http://www.w3.org/2000/svg"><path d="${ctaPath}" fill="${ctaColor}"/></svg>`;
+    composites.push({ input: await rasterizeSvg(ctaTextSvg, size, footerH), top: 0, left: 0 });
   }
 
   if (cfg.showWebsite) {
@@ -388,15 +391,52 @@ function computePhotoGrid(count: number, areaW: number, areaH: number, gap: numb
   return cells;
 }
 
+/** Solo fotos en collage 1080x1080 — sin header ni footer */
+export async function composePlainGalleryGrid(photoBuffers: Buffer[]): Promise<Buffer> {
+  const { size } = FRAME;
+  const gap = 8;
+  const photos = photoBuffers.slice(0, 4);
+  if (photos.length === 0) throw new Error('Se requiere al menos una foto');
+
+  const cells = computePhotoGrid(photos.length, size, size, gap);
+  const photoComposites: sharp.OverlayOptions[] = [];
+
+  for (let i = 0; i < photos.length; i++) {
+    const cell = cells[i];
+    let tile: Buffer;
+    try {
+      tile = await sharp(photos[i])
+        .rotate()
+        .resize(cell.w, cell.h, { fit: 'cover', position: 'centre' })
+        .png()
+        .toBuffer();
+    } catch {
+      throw new Error(`No se pudo procesar la foto ${i + 1}. Verifica que sea JPG o PNG valido.`);
+    }
+    photoComposites.push({ input: tile, top: cell.y, left: cell.x });
+  }
+
+  return sharp({
+    create: { width: size, height: size, channels: 3, background: { r: 255, g: 255, b: 255 } },
+  })
+    .composite(photoComposites)
+    .png({ quality: 94 })
+    .toBuffer();
+}
+
 export async function composePollonGalleryFrame(input: FrameComposeInput): Promise<Buffer> {
+  const photos = input.photoBuffers.slice(0, 4);
+  if (photos.length === 0) throw new Error('Se requiere al menos una foto');
+
+  if (input.skipFrame) {
+    return composePlainGalleryGrid(photos);
+  }
+
   const cfg = input.frameConfig || defaultFrameConfig();
   const { size } = FRAME;
   const footerH = cfg.footerHeight;
   const contentH = size - footerH;
   const gap = 8;
-  const photos = input.photoBuffers.slice(0, 4);
-  if (photos.length === 0) throw new Error('Se requiere al menos una foto');
-
   const brandFallback = cfg.accentColor || input.brandColor || FRAME.defaultAccent;
   const accent = await extractSmartAccentColor(photos, brandFallback);
 

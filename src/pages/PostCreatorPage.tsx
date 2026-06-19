@@ -60,7 +60,7 @@ export default function PostCreatorPage() {
   const [aiProvider, setAiProvider] = useState<string | null>(null);
   const [aiHint, setAiHint] = useState<string | null>(null);
   const [frameTemplates, setFrameTemplates] = useState<BrandFrameTemplate[]>([]);
-  const [footerMode, setFooterMode] = useState<'default' | 'pick'>('default');
+  const [footerMode, setFooterMode] = useState<'default' | 'pick' | 'none'>('default');
   const [selectedFrameTemplateId, setSelectedFrameTemplateId] = useState('');
 
   const returnPath = id ? `/posts/${id}/edit` : '/posts/new';
@@ -261,6 +261,7 @@ export default function PostCreatorPage() {
           cta: watched.cta || POLLON_CONTACT.defaultCta,
           brand_color: branch.brand_color || '#c50000',
           post_id: id,
+          use_frame: usesGalleryFrame ? footerMode !== 'none' : undefined,
           frame_template_id: usesGalleryFrame && footerMode === 'pick' ? selectedFrameTemplateId : undefined,
         }),
       });
@@ -491,6 +492,19 @@ export default function PostCreatorPage() {
                           No hay plantillas. Créalas en el menú Header y Footer.
                         </p>
                       )}
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="footerMode"
+                      checked={footerMode === 'none'}
+                      onChange={() => setFooterMode('none')}
+                      className="mt-1"
+                    />
+                    <div>
+                      <span className="text-sm font-medium">Sin footer</span>
+                      <p className="text-xs text-gray-500">Genera la imagen solo con la foto, sin header ni footer de marca.</p>
                     </div>
                   </label>
                 </div>

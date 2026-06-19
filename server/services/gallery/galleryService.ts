@@ -18,6 +18,7 @@ async function renderGalleryPhotos(params: {
   postId?: string;
   branchId?: string;
   frameTemplateId?: string | null;
+  useFrame?: boolean;
 }): Promise<string> {
   const buffer = await composeMultiGalleryCollage({
     photoUrls: params.photoUrls,
@@ -27,6 +28,7 @@ async function renderGalleryPhotos(params: {
     logoUrl: params.logoUrl,
     branchId: params.branchId,
     frameTemplateId: params.frameTemplateId,
+    useFrame: params.useFrame,
   });
   return uploadComposedImage(buffer, params.postId);
 }
@@ -49,6 +51,7 @@ export interface GenerateFromGalleryParams {
   postId?: string;
   galleryItemIds?: string[];
   frameTemplateId?: string | null;
+  useFrame?: boolean;
 }
 
 export interface GenerateFromGalleryResult {
@@ -124,6 +127,7 @@ export async function generatePostImage(params: GenerateFromGalleryParams): Prom
       postId: params.postId,
       branchId: params.branchId,
       frameTemplateId: params.frameTemplateId,
+      useFrame: params.useFrame,
     });
 
     return {
@@ -166,6 +170,7 @@ export async function generatePostImage(params: GenerateFromGalleryParams): Prom
       postId: params.postId,
       branchId: params.branchId,
       frameTemplateId: params.frameTemplateId,
+      useFrame: params.useFrame,
     });
     return {
       url,

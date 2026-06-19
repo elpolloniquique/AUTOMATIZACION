@@ -2,13 +2,14 @@ import sharp from 'sharp';
 
 const iconCache = new Map<string, Buffer>();
 
-async function rasterizeIcon(svg: string, size: number): Promise<Buffer> {
-  const key = `${size}:${svg.slice(0, 40)}`;
+async function rasterizeIcon(iconId: string, svg: string, size: number, width?: number): Promise<Buffer> {
+  const w = width ?? size;
+  const key = `${iconId}:${w}x${size}`;
   const cached = iconCache.get(key);
   if (cached) return cached;
 
   const buf = await sharp(Buffer.from(svg, 'utf8'), { density: 192 })
-    .resize(size, size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .resize(w, size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
     .toBuffer();
 
@@ -18,76 +19,82 @@ async function rasterizeIcon(svg: string, size: number): Promise<Buffer> {
 
 /** Icono WhatsApp realista con gradiente verde */
 export async function getWhatsappIcon(size: number): Promise<Buffer> {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 96 96">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
     <defs>
-      <linearGradient id="wa" x1="8" y1="8" x2="88" y2="88" gradientUnits="userSpaceOnUse">
+      <linearGradient id="waGrad" x1="8" y1="8" x2="88" y2="88" gradientUnits="userSpaceOnUse">
         <stop offset="0" stop-color="#5FE06A"/>
         <stop offset="0.5" stop-color="#25D366"/>
         <stop offset="1" stop-color="#128C7E"/>
       </linearGradient>
-      <filter id="sh" x="-10%" y="-10%" width="120%" height="120%">
+      <filter id="waSh" x="-10%" y="-10%" width="120%" height="120%">
         <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.22"/>
       </filter>
     </defs>
-    <circle cx="48" cy="48" r="42" fill="url(#wa)" filter="url(#sh)"/>
+    <circle cx="48" cy="48" r="42" fill="url(#waGrad)" filter="url(#waSh)"/>
     <path fill="#fff" d="M48 18c-16.5 0-30 13.1-30 29.2 0 5.1 1.4 10.1 4.1 14.5L18 78l16.8-4.4c4.2 2.3 8.9 3.5 13.7 3.5 16.5 0 30-13.1 30-29.2S64.5 18 48 18zm0 53.4c-4.4 0-8.7-1.2-12.4-3.4l-.9-.5-9.9 2.6 2.6-9.6-.6-.9c-2.4-3.8-3.7-8.2-3.7-12.7 0-13.4 11-24.3 24.9-24.3S72.4 34.9 72.4 48.3 61.4 71.4 48 71.4z"/>
     <path fill="#fff" d="M66.2 55.8c-.9-.4-5.2-2.6-6-2.9-.8-.3-1.4-.5-2 .5-.6 1-2.2 2.9-2.7 3.5-.5.6-.9.7-1.8.2-.9-.4-3.7-1.4-7-4.3-2.6-2.3-4.3-5.1-4.8-6-.5-.9 0-1.4.6-1.8.5-.5 1.2-1.3 1.8-1.9.6-.6.8-1.1 1-1.8.2-.7 0-1.4-.2-2-.2-.6-1.9-4.7-2.6-6.4-.7-1.6-1.4-1.3-1.9-1.3h-1.7c-.6 0-1.4.3-2.2 1-.8.8-3 2.6-3 6.4s2.9 7.5 3.4 8 .6 1.3 5.8 8.5c7.1 4.5 12.4 5.8 14.2 6.4 1.9.7 3.5.6 4.8.4 1.5-.2 4.9-2 5.7-4 .8-2 .8-3.7.6-4-.2-.4-.9-.6-1.8-1z"/>
   </svg>`;
-  return rasterizeIcon(svg, size);
+  return rasterizeIcon('whatsapp', svg, size);
 }
 
-/** Icono web/globo realista con gradiente azul */
+/** Icono internet / pagina web — globo azul claramente distinto de WhatsApp */
 export async function getGlobeIcon(size: number): Promise<Buffer> {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 96 96">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
     <defs>
-      <radialGradient id="globe" cx="35%" cy="30%" r="65%">
-        <stop offset="0" stop-color="#7EB8FF"/>
-        <stop offset="0.45" stop-color="#3B82F6"/>
-        <stop offset="1" stop-color="#1D4ED8"/>
+      <radialGradient id="webGlobe" cx="38%" cy="32%" r="68%">
+        <stop offset="0" stop-color="#93C5FD"/>
+        <stop offset="0.5" stop-color="#2563EB"/>
+        <stop offset="1" stop-color="#1E3A8A"/>
       </radialGradient>
-      <filter id="gs" x="-10%" y="-10%" width="120%" height="120%">
+      <filter id="webSh" x="-10%" y="-10%" width="120%" height="120%">
         <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.2"/>
       </filter>
     </defs>
-    <circle cx="48" cy="48" r="40" fill="url(#globe)" filter="url(#gs)"/>
-    <ellipse cx="48" cy="48" rx="40" ry="14" fill="none" stroke="#fff" stroke-width="2.2" opacity="0.85"/>
-    <ellipse cx="48" cy="48" rx="14" ry="40" fill="none" stroke="#fff" stroke-width="2.2" opacity="0.85"/>
-    <path d="M8 48h80M48 8v80" stroke="#fff" stroke-width="1.8" opacity="0.55"/>
-    <path fill="#fff" opacity="0.9" d="M30 36c4-6 10-10 18-10 3 0 6 1 8 2-3 2-5 5-6 8-4-1-8 0-12 0zm22 28c-6 4-14 5-20 2 2-3 5-5 9-6 3 3 7 5 11 4z"/>
-    <ellipse cx="36" cy="34" rx="10" ry="6" fill="#fff" opacity="0.25"/>
+    <circle cx="48" cy="48" r="40" fill="url(#webGlobe)" filter="url(#webSh)"/>
+    <ellipse cx="48" cy="48" rx="40" ry="15" fill="none" stroke="#fff" stroke-width="2.5"/>
+    <ellipse cx="48" cy="48" rx="15" ry="40" fill="none" stroke="#fff" stroke-width="2.5"/>
+    <path d="M8 48h80" stroke="#fff" stroke-width="2" opacity="0.7"/>
+    <path d="M48 8v80" stroke="#fff" stroke-width="2" opacity="0.7"/>
+    <path fill="#fff" opacity="0.95" d="M28 38c3-5 9-9 16-9 2 0 4 0 6 1-2 2-4 4-5 7-5-1-10 0-17 1zm20 26c-5 3-12 4-18 1 2-2 4-4 8-5 2 2 6 4 10 4z"/>
+    <path fill="#fff" opacity="0.9" d="M34 58h28v3H34zm0 5h22v3H34zm0 5h16v3H34z"/>
   </svg>`;
-  return rasterizeIcon(svg, size);
+  return rasterizeIcon('globe', svg, size);
 }
 
-/** Icono moto delivery realista */
+/** Icono delivery — moto roja con rayo de velocidad */
 export async function getDeliveryIcon(size: number): Promise<Buffer> {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 96 72">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
     <defs>
-      <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="#E53935"/>
-        <stop offset="1" stop-color="#B71C1C"/>
+      <linearGradient id="motoRed" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#FF5252"/>
+        <stop offset="1" stop-color="#C50000"/>
       </linearGradient>
     </defs>
-    <g transform="translate(4,8)">
-      <circle cx="18" cy="48" r="11" fill="#263238" stroke="#90A4AE" stroke-width="2.5"/>
-      <circle cx="18" cy="48" r="5" fill="#CFD8DC"/>
-      <circle cx="66" cy="48" r="11" fill="#263238" stroke="#90A4AE" stroke-width="2.5"/>
-      <circle cx="66" cy="48" r="5" fill="#CFD8DC"/>
-      <path fill="url(#body)" d="M22 38h18l8-14h12l6 14h8l-4-18H52L42 8H28l-4 14H14l4 16z"/>
-      <rect x="38" y="10" width="14" height="10" rx="2" fill="#FFCDD2"/>
-      <path fill="#455A64" d="M48 22h14l4 10H46z"/>
-      <circle cx="74" cy="18" r="7" fill="#FFEB3B" stroke="#F9A825" stroke-width="1.5"/>
-      <path fill="#fff" d="M72 16h4v4h-4z"/>
-      <path fill="#37474F" d="M8 32h10v8H8z"/>
-    </g>
+    <path fill="#FFC107" d="M8 28 L22 28 L18 38 L8 38 Z"/>
+    <path fill="#FFD54F" d="M22 22 L32 28 L28 36 L18 32 Z"/>
+    <circle cx="24" cy="68" r="12" fill="#37474F"/>
+    <circle cx="24" cy="68" r="5" fill="#ECEFF1"/>
+    <circle cx="68" cy="68" r="12" fill="#37474F"/>
+    <circle cx="68" cy="68" r="5" fill="#ECEFF1"/>
+    <path fill="url(#motoRed)" d="M28 52h16l10-18h14l8 18h10l-6-24H58L46 20H32l-6 18H20l4 14z"/>
+    <rect x="42" y="22" width="16" height="12" rx="2" fill="#FFCDD2" stroke="#C50000" stroke-width="1"/>
+    <path fill="#455A64" d="M54 38h16l5 14H52z"/>
+    <circle cx="78" cy="32" r="8" fill="#FFEB3B" stroke="#F9A825" stroke-width="1.5"/>
+    <path fill="#C50000" d="M36 44h4v12h-4z M40 40h8l-2 16h-8z"/>
   </svg>`;
-  const key = `delivery:${size}`;
-  const cached = iconCache.get(key);
-  if (cached) return cached;
-  const buf = await sharp(Buffer.from(svg, 'utf8'), { density: 192 })
-    .resize(Math.round(size * 1.35), size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .png()
-    .toBuffer();
-  iconCache.set(key, buf);
-  return buf;
+  return rasterizeIcon('delivery', svg, size);
+}
+
+/** Rayo rojo de velocidad (alternativa compacta para boton CTA) */
+export async function getSpeedBoltIcon(size: number): Promise<Buffer> {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+    <defs>
+      <linearGradient id="boltGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#FF6B6B"/>
+        <stop offset="1" stop-color="#C50000"/>
+      </linearGradient>
+    </defs>
+    <path fill="url(#boltGrad)" d="M52 8 L28 52 H44 L36 88 L68 40 H50 L52 8 Z"/>
+  </svg>`;
+  return rasterizeIcon('bolt', svg, size);
 }
