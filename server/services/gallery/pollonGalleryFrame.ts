@@ -152,7 +152,7 @@ function buildCornerHeaderSvg(accent: string): string {
     </svg>`;
 }
 
-function buildFooterSvg(accent: string): string {
+function buildFooterSvg(accent: string, hasFooterLogo = false): string {
   const { size, footerH } = FRAME;
   const color = safeHexColor(accent);
   const phone = escapeXml('+56 9 86925310');
@@ -160,12 +160,13 @@ function buildFooterSvg(accent: string): string {
   const btnY = Math.round(footerH / 2 - 30);
   const btnX = Math.round(size / 2 - 152);
   const rowY = Math.round(footerH / 2 - 20);
+  const rowX = hasFooterLogo ? 72 : 20;
   const webX = size - 290;
 
   return `
     <svg width="${size}" height="${footerH}" xmlns="http://www.w3.org/2000/svg">
       <rect width="${size}" height="${footerH}" fill="${color}"/>
-      <g transform="translate(20, ${rowY})">
+      <g transform="translate(${rowX}, ${rowY})">
         <circle cx="20" cy="20" r="20" fill="#25D366"/>
         <path fill="#ffffff" d="M20 10a10 10 0 00-10 10c0 1.8.5 3.5 1.4 5l-1.3 4.7 4.8-1.3a10 10 0 0014.1-9.4A10 10 0 0020 10z"/>
         <text x="50" y="27" fill="#ffffff" font-family="Arial,sans-serif" font-size="22" font-weight="700">${phone}</text>
@@ -233,35 +234,29 @@ async function loadLogoFromFile(): Promise<Buffer | null> {
   return null;
 }
 
-async function prepareCircularLogo(logoUrl?: string): Promise<Buffer> {
-  const { logoSize } = FRAME;
-  let raster: Buffer | null = null;
-
+async function loadLogoRaster(logoUrl?: string): Promise<Buffer | null> {
   if (logoUrl?.startsWith('http')) {
     try {
-      const { data } = await axios.get(logoUrl, {
+      const cleanUrl = logoUrl.split('?')[0];
+      const { data } = await axios.get(cleanUrl, {
         responseType: 'arraybuffer',
         timeout: 15000,
         maxContentLength: 5 * 1024 * 1024,
       });
-      raster = await sharp(Buffer.from(data)).rotate().png().toBuffer();
+      return await sharp(Buffer.from(data)).rotate().png().toBuffer();
     } catch {
-      raster = null;
+      return null;
     }
   }
+  return null;
+}
 
-  if (!raster) {
-    raster = await loadLogoFromFile();
-  }
-  if (!raster) {
-    raster = await buildDefaultLogoPng(logoSize);
-  }
-
-  const inner = logoSize - 14;
+async function prepareLogoBadge(raster: Buffer, badgeSize: number): Promise<Buffer> {
+  const inner = badgeSize - 14;
   let photo: Buffer;
   try {
     photo = await sharp(raster)
-      .resize(inner, inner, { fit: 'cover' })
+      .resize(inner, inner, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
       .png()
       .toBuffer();
   } catch {
@@ -279,17 +274,30 @@ async function prepareCircularLogo(logoUrl?: string): Promise<Buffer> {
     .toBuffer();
 
   const ringSvg = `
-    <svg width="${logoSize}" height="${logoSize}" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="${logoSize / 2}" cy="${logoSize / 2}" r="${logoSize / 2 - 3}" fill="#ffffff"/>
-      <circle cx="${logoSize / 2}" cy="${logoSize / 2}" r="${logoSize / 2 - 6}" fill="none" stroke="#ffffff" stroke-width="5"/>
+    <svg width="${badgeSize}" height="${badgeSize}" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="${badgeSize / 2}" cy="${badgeSize / 2}" r="${badgeSize / 2 - 3}" fill="#ffffff"/>
+      <circle cx="${badgeSize / 2}" cy="${badgeSize / 2}" r="${badgeSize / 2 - 6}" fill="none" stroke="#ffffff" stroke-width="5"/>
     </svg>`;
 
-  const ring = await rasterizeSvg(ringSvg, logoSize, logoSize);
+  const ring = await rasterizeSvg(ringSvg, badgeSize, badgeSize);
 
   return sharp(ring)
     .composite([{ input: masked, top: 7, left: 7 }])
     .png()
     .toBuffer();
+}
+
+async function prepareCircularLogo(logoUrl?: string): Promise<Buffer> {
+  let raster = await loadLogoRaster(logoUrl);
+  if (!raster) raster = await loadLogoFromFile();
+  if (!raster) raster = await buildDefaultLogoPng(FRAME.logoSize);
+  return prepareLogoBadge(raster, FRAME.logoSize);
+}
+
+async function prepareFooterLogo(logoUrl?: string): Promise<Buffer | null> {
+  let raster = await loadLogoRaster(logoUrl);
+  if (!raster) return null;
+  return prepareLogoBadge(raster, 52);
 }
 
 function computePhotoGrid(count: number, areaW: number, areaH: number, gap: number) {
@@ -357,23 +365,36 @@ export async function composePollonGalleryFrame(input: FrameComposeInput): Promi
     .toBuffer();
 
   const fadeH = 48;
-  const [logo, footer, corner, fade] = await Promise.all([
+  const [logo, footerLogo] = await Promise.all([
     prepareCircularLogo(input.logoUrl),
-    rasterizeSvg(buildFooterSvg(accent), size, footerH),
+    prepareFooterLogo(input.logoUrl),
+  ]);
+  const [footer, corner, fade] = await Promise.all([
+    rasterizeSvg(buildFooterSvg(accent, Boolean(footerLogo)), size, footerH),
     rasterizeSvg(buildCornerHeaderSvg(accent), size, FRAME.cornerSize),
     rasterizeSvg(buildBottomFadeSvg(accent, size, fadeH), size, fadeH),
   ]);
 
+  const composites: sharp.OverlayOptions[] = [
+    { input: contentLayer, top: 0, left: 0 },
+    { input: fade, top: contentH - fadeH, left: 0 },
+    { input: footer, top: contentH, left: 0 },
+    { input: corner, top: 0, left: 0 },
+    { input: logo, top: FRAME.logoY, left: FRAME.logoX },
+  ];
+
+  if (footerLogo) {
+    composites.push({
+      input: footerLogo,
+      top: contentH + Math.round((footerH - 52) / 2),
+      left: 8,
+    });
+  }
+
   return sharp({
     create: { width: size, height: size, channels: 3, background: { r: 255, g: 255, b: 255 } },
   })
-    .composite([
-      { input: contentLayer, top: 0, left: 0 },
-      { input: fade, top: contentH - fadeH, left: 0 },
-      { input: footer, top: contentH, left: 0 },
-      { input: corner, top: 0, left: 0 },
-      { input: logo, top: FRAME.logoY, left: FRAME.logoX },
-    ])
+    .composite(composites)
     .png({ quality: 94 })
     .toBuffer();
 }
