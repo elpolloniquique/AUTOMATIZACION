@@ -14,6 +14,7 @@ async function renderGalleryPhotos(params: {
   offerTitle: string;
   price?: string;
   brandColor?: string;
+  logoUrl?: string;
   postId?: string;
 }): Promise<string> {
   const buffer = await composeMultiGalleryCollage({
@@ -21,6 +22,7 @@ async function renderGalleryPhotos(params: {
     title: params.offerTitle,
     price: params.price,
     brandColor: params.brandColor,
+    logoUrl: params.logoUrl,
   });
   return uploadComposedImage(buffer, params.postId);
 }
@@ -113,6 +115,7 @@ export async function generatePostImage(params: GenerateFromGalleryParams): Prom
       offerTitle: params.offerTitle,
       price: params.price,
       brandColor: params.brandColor,
+      logoUrl: params.logoUrl,
       postId: params.postId,
     });
 
@@ -152,6 +155,7 @@ export async function generatePostImage(params: GenerateFromGalleryParams): Prom
       offerTitle: params.offerTitle,
       price: params.price,
       brandColor: params.brandColor,
+      logoUrl: params.logoUrl,
       postId: params.postId,
     });
     return {

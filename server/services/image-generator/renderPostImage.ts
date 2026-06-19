@@ -51,6 +51,7 @@ export async function renderPostImage(params: RenderPostImageParams): Promise<st
       title: params.offerTitle,
       price: params.price,
       brandColor: params.brandColor,
+      logoUrl: params.logoUrl,
     });
     return uploadComposedImage(buffer, params.postId);
   }

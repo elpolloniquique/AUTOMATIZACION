@@ -1,6 +1,7 @@
 import axios from 'axios';
 import sharp from 'sharp';
 import { config } from '../../config/index.js';
+import { composePollonGalleryFrame } from './pollonGalleryFrame.js';
 
 interface SceneStyle {
   wallTop: string;
@@ -130,6 +131,7 @@ export interface MultiCollageOptions {
   title?: string;
   price?: string;
   brandColor?: string;
+  logoUrl?: string;
 }
 
 export async function addBrandOverlay(imageBuffer: Buffer, options: BrandOverlayOptions): Promise<Buffer> {
@@ -208,93 +210,18 @@ export async function composeGalleryImage(options: ComposeOptions): Promise<Buff
   });
 }
 
-/** Collage profesional 1–4 fotos de galería para publicación en redes */
+/** Plantilla El Pollón inteligente — 1 a 4 fotos con header, logo y footer adaptativo */
 export async function composeMultiGalleryCollage(options: MultiCollageOptions): Promise<Buffer> {
-  const size = 1080;
-  const gap = 12;
-  const headerH = 100;
-  const footerH = 200;
-  const gridH = size - headerH - footerH;
   const urls = options.photoUrls.slice(0, 4);
   if (urls.length === 0) throw new Error('Se requiere al menos una foto');
 
-  const brandColor = options.brandColor || '#c50000';
-  const title = escapeXml((options.title || '').slice(0, 55));
-  const price = escapeXml(options.price || '');
+  const photoBuffers = await Promise.all(urls.map((url) => downloadImage(url)));
 
-  const headerSvg = Buffer.from(`
-    <svg width="${size}" height="${headerH}" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="bar" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="${brandColor}"/>
-          <stop offset="100%" stop-color="#8b0000"/>
-        </linearGradient>
-      </defs>
-      <rect width="${size}" height="${headerH}" fill="url(#bar)"/>
-      <text x="36" y="42" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="28" font-weight="800">EL POLLÓN</text>
-      <text x="36" y="72" fill="#ffcc00" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="700">SABOR PERUANO · DELIVERY ${urls.length > 1 ? `· ${urls.length} PLATOS` : ''}</text>
-    </svg>
-  `);
-
-  const footerSvg = Buffer.from(`
-    <svg width="${size}" height="${footerH}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="${size}" height="${footerH}" fill="#111"/>
-      ${title ? `<text x="36" y="50" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="32" font-weight="900">${title}</text>` : ''}
-      ${price ? `<text x="36" y="100" fill="#ffcc00" font-family="Arial,Helvetica,sans-serif" font-size="40" font-weight="900">${price}</text>` : ''}
-      <rect x="36" y="${footerH - 56}" width="420" height="36" rx="18" fill="#25d366"/>
-      <text x="52" y="${footerH - 32}" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="800">WhatsApp +56 9 8692 5310 · el-pollon.cl</text>
-    </svg>
-  `);
-
-  const photos = await Promise.all(urls.map((url) => downloadImage(url)));
-  const cells: Array<{ w: number; h: number; x: number; y: number }> = [];
-
-  if (urls.length === 1) {
-    cells.push({ w: size, h: gridH, x: 0, y: 0 });
-  } else if (urls.length === 2) {
-    const w = Math.floor((size - gap) / 2);
-    cells.push({ w, h: gridH, x: 0, y: 0 }, { w, h: gridH, x: w + gap, y: 0 });
-  } else if (urls.length === 3) {
-    const topH = Math.floor((gridH - gap) / 2);
-    const bottomH = gridH - topH - gap;
-    const topW = Math.floor((size - gap) / 2);
-    cells.push(
-      { w: topW, h: topH, x: 0, y: 0 },
-      { w: topW, h: topH, x: topW + gap, y: 0 },
-      { w: size, h: bottomH, x: 0, y: topH + gap },
-    );
-  } else {
-    const w = Math.floor((size - gap) / 2);
-    const h = Math.floor((gridH - gap) / 2);
-    cells.push(
-      { w, h, x: 0, y: 0 },
-      { w, h, x: w + gap, y: 0 },
-      { w, h, x: 0, y: h + gap },
-      { w, h, x: w + gap, y: h + gap },
-    );
-  }
-
-  const composites: sharp.OverlayOptions[] = [
-    { input: headerSvg, top: 0, left: 0 },
-    { input: footerSvg, top: size - footerH, left: 0 },
-  ];
-
-  for (let i = 0; i < photos.length; i++) {
-    const cell = cells[i];
-    const tile = await sharp(photos[i])
-      .rotate()
-      .resize(cell.w, cell.h, { fit: 'cover', position: 'centre' })
-      .png()
-      .toBuffer();
-    composites.push({ input: tile, top: headerH + cell.y, left: cell.x });
-  }
-
-  return sharp({
-    create: { width: size, height: size, channels: 3, background: { r: 255, g: 255, b: 255 } },
-  })
-    .composite(composites)
-    .png({ quality: 92 })
-    .toBuffer();
+  return composePollonGalleryFrame({
+    photoBuffers,
+    brandColor: options.brandColor,
+    logoUrl: options.logoUrl,
+  });
 }
 
 function escapeXml(s: string): string {

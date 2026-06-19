@@ -454,9 +454,9 @@ export default function PostCreatorPage() {
                 )}
                 {lastMatch.aiSource === 'collage' && (
                   <span className="block text-green-700 mt-1 font-medium">
-                    ✓ Imagen generada con tu foto de galería
+                    ✓ Plantilla El Pollón aplicada (color adaptado a tu foto)
                     {lastMatch.galleryItems && lastMatch.galleryItems.length > 1
-                      ? ` (${lastMatch.galleryItems.length} fotos en collage)`
+                      ? ` · ${lastMatch.galleryItems.length} fotos`
                       : ''}
                   </span>
                 )}
