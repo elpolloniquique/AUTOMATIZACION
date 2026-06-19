@@ -177,6 +177,21 @@ async function main() {
     ok(`Imagen con plantilla "${tpl.name}" en ${e2}s → ${body2.url}`);
   }
 
+  console.log('⏳ Probando Sin footer (solo foto)...');
+  const t3 = Date.now();
+  const gen3 = await fetch(`${PROD_URL}/api/images/generate`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ ...payload, use_frame: false }),
+  });
+  const body3 = await gen3.json();
+  const e3 = ((Date.now() - t3) / 1000).toFixed(1);
+  if (!gen3.ok || !body3.url) fail(`Sin footer falló: ${body3.error || gen3.status}`);
+  ok(`Imagen sin footer en ${e3}s → ${body3.url}`);
+
   console.log('\n🎉 Verificación de producción completada correctamente.');
 }
 
