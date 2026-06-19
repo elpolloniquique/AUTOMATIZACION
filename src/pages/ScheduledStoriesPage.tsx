@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Clock, History, Plus, Save, Send, Trash2, BookImage } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -51,14 +51,32 @@ export default function ScheduledStoriesPage() {
 
   const canManage = profile?.role === 'super_admin' || profile?.role === 'admin_sucursal';
   const returnPath = '/stories';
+  const branchesLoaded = useRef(false);
+
+  function applyGalleryItem(item: MediaGalleryItem) {
+    setSelectedGallery([item]);
+    setForm((f) => ({
+      ...f,
+      image_url: item.public_url,
+      gallery_item_id: item.id,
+      title: f.title || item.title,
+    }));
+  }
 
   useEffect(() => {
     supabase.from('branches').select('*').eq('is_active', true).order('name').then(({ data }) => {
-      if (data) {
-        setBranches(data as Branch[]);
-        const def = profile?.branch_id || data[0]?.id || '';
-        setBranchId(def);
-        setForm(emptyForm(def));
+      if (!data?.length) return;
+      setBranches(data as Branch[]);
+      const def = profile?.branch_id || data[0]?.id || '';
+      setBranchId((prev) => prev || def);
+      if (!branchesLoaded.current) {
+        branchesLoaded.current = true;
+        setForm((prev) => {
+          if (prev.image_url || prev.title.trim()) {
+            return { ...prev, branch_id: prev.branch_id || def };
+          }
+          return emptyForm(def);
+        });
       }
     });
   }, [profile]);
@@ -66,12 +84,18 @@ export default function ScheduledStoriesPage() {
   useEffect(() => {
     const pick = location.state as GalleryPickState | null;
     if (pick?.selectedGalleryItems?.length) {
-      const item = pick.selectedGalleryItems[0];
-      setSelectedGallery([item]);
-      setForm((f) => ({ ...f, image_url: item.public_url, gallery_item_id: item.id }));
+      applyGalleryItem(pick.selectedGalleryItems[0]);
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
+
+  useEffect(() => {
+    const url = selectedGallery[0]?.public_url;
+    const id = selectedGallery[0]?.id;
+    if (url && (form.image_url !== url || form.gallery_item_id !== id)) {
+      setForm((f) => ({ ...f, image_url: url, gallery_item_id: id }));
+    }
+  }, [selectedGallery, form.image_url, form.gallery_item_id]);
 
   const loadStories = useCallback(async () => {
     if (!session?.access_token || !branchId) return;
@@ -131,8 +155,11 @@ export default function ScheduledStoriesPage() {
 
   async function handleSave() {
     if (!session?.access_token || !canManage) return;
+    const imageUrl = selectedGallery[0]?.public_url || form.image_url;
+    const galleryItemId = selectedGallery[0]?.id || form.gallery_item_id || null;
+
     if (!form.title.trim()) return alert('Nombre requerido');
-    if (!form.image_url) return alert('Selecciona una imagen de la galería');
+    if (!imageUrl) return alert('Selecciona una imagen de la galería');
     if (form.days_of_week.length === 0) return alert('Selecciona al menos un día');
 
     setSaving(true);
@@ -140,7 +167,8 @@ export default function ScheduledStoriesPage() {
       const payload = {
         ...form,
         branch_id: branchId,
-        gallery_item_id: selectedGallery[0]?.id || form.gallery_item_id || null,
+        image_url: imageUrl,
+        gallery_item_id: galleryItemId,
         publish_time: form.publish_time.length === 5 ? `${form.publish_time}:00` : form.publish_time,
         timezone: 'America/Santiago',
       };
@@ -216,7 +244,11 @@ export default function ScheduledStoriesPage() {
             <select
               className="border rounded-md h-10 px-3 min-w-[200px]"
               value={branchId}
-              onChange={(e) => { setBranchId(e.target.value); setForm(emptyForm(e.target.value)); startNew(); }}
+              onChange={(e) => {
+                setBranchId(e.target.value);
+                setForm((f) => ({ ...emptyForm(e.target.value), title: f.title, image_url: f.image_url, gallery_item_id: f.gallery_item_id, days_of_week: f.days_of_week, publish_time: f.publish_time, is_active: f.is_active }));
+                setEditing(null);
+              }}
             >
               {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
@@ -297,7 +329,10 @@ export default function ScheduledStoriesPage() {
                 <GallerySelectionBar
                   selected={selectedGallery}
                   maxPhotos={1}
-                  onRemove={() => { setSelectedGallery([]); setForm({ ...form, image_url: '', gallery_item_id: null }); }}
+                  onRemove={() => {
+                    setSelectedGallery([]);
+                    setForm((f) => ({ ...f, image_url: '', gallery_item_id: null }));
+                  }}
                   returnPath={returnPath}
                 />
 
