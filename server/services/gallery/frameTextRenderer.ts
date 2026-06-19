@@ -6,7 +6,7 @@ import axios from 'axios';
 import opentype from 'opentype.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FONT_NAME = 'DejaVuSans-Bold.ttf';
+const FONT_NAME = 'Roboto-Bold.ttf';
 
 let fontCache: opentype.Font | null = null;
 
@@ -40,8 +40,8 @@ async function loadFontFromDisk(): Promise<opentype.Font | null> {
 
 async function loadFontFromRemote(): Promise<opentype.Font> {
   const urls = [
-    'https://github.com/GravityPDF/mpdf-core-fonts/raw/master/DejaVuSans-Bold.ttf',
-    'https://raw.githubusercontent.com/GravityPDF/mpdf-core-fonts/master/DejaVuSans-Bold.ttf',
+    'https://github.com/googlefonts/roboto-2/raw/main/src/hinted/Roboto-Bold.ttf',
+    'https://raw.githubusercontent.com/googlefonts/roboto-2/main/src/hinted/Roboto-Bold.ttf',
   ];
   for (const url of urls) {
     try {

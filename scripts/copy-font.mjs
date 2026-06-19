@@ -3,14 +3,14 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const FONT_NAME = 'DejaVuSans-Bold.ttf';
+const FONT_NAME = 'Roboto-Bold.ttf';
 const src = join(root, 'templates/fonts', FONT_NAME);
 const targets = [
   join(root, 'api/fonts', FONT_NAME),
   join(root, 'dist/server/assets/fonts', FONT_NAME),
 ];
 
-const FONT_URL = 'https://github.com/GravityPDF/mpdf-core-fonts/raw/master/DejaVuSans-Bold.ttf';
+const FONT_URL = 'https://github.com/googlefonts/roboto-2/raw/main/src/hinted/Roboto-Bold.ttf';
 
 function isValidTtfBuffer(buf) {
   return buf.length > 4 && buf[0] === 0 && buf[1] === 1 && buf[2] === 0 && buf[3] === 0;
