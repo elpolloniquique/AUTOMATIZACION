@@ -193,6 +193,7 @@ app.post('/api/images/generate', authMiddleware, asyncHandler(async (req, res) =
     brand_color: optionalString(),
     post_id: z.string().uuid().optional(),
     gallery_item_ids: z.array(z.string().uuid()).min(1).max(4).optional(),
+    frame_template_id: z.string().uuid().optional().nullable(),
   });
 
   const parsed = schema.safeParse(req.body);
@@ -217,6 +218,7 @@ app.post('/api/images/generate', authMiddleware, asyncHandler(async (req, res) =
     brandColor: parsed.data.brand_color,
     postId: parsed.data.post_id,
     galleryItemIds: parsed.data.gallery_item_ids,
+    frameTemplateId: parsed.data.frame_template_id,
   });
   res.json(result);
 }));

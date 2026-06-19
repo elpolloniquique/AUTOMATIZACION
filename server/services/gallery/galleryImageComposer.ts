@@ -134,6 +134,7 @@ export interface MultiCollageOptions {
   brandColor?: string;
   logoUrl?: string;
   branchId?: string;
+  frameTemplateId?: string | null;
 }
 
 export async function addBrandOverlay(imageBuffer: Buffer, options: BrandOverlayOptions): Promise<Buffer> {
@@ -218,7 +219,7 @@ export async function composeMultiGalleryCollage(options: MultiCollageOptions): 
   if (urls.length === 0) throw new Error('Se requiere al menos una foto');
 
   const photoBuffers = await Promise.all(urls.map((url) => downloadImage(url)));
-  const frameConfig = await resolveFrameConfig(options.branchId);
+  const frameConfig = await resolveFrameConfig(options.branchId, options.frameTemplateId);
 
   return composePollonGalleryFrame({
     photoBuffers,

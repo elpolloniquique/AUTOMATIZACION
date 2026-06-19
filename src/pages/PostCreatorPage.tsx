@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SocialPreview } from '@/components/SocialPreview';
 import { HashtagEditor } from '@/components/HashtagEditor';
 import { GallerySelectionBar } from '@/components/GallerySelectionBar';
-import type { Branch, Platform, PostType, ImageGenerateMode, ImageGenerateResult, MediaGalleryItem, Post } from '@/types';
+import type { Branch, Platform, PostType, ImageGenerateMode, ImageGenerateResult, MediaGalleryItem, Post, BrandFrameTemplate } from '@/types';
 import { PLATFORM_LABELS, POST_TYPE_LABELS } from '@/types';
 import { POLLON_CONTACT } from '@/constants/pollonBrand';
 
@@ -59,6 +59,9 @@ export default function PostCreatorPage() {
   const [openAiReady, setOpenAiReady] = useState<boolean | null>(null);
   const [aiProvider, setAiProvider] = useState<string | null>(null);
   const [aiHint, setAiHint] = useState<string | null>(null);
+  const [frameTemplates, setFrameTemplates] = useState<BrandFrameTemplate[]>([]);
+  const [footerMode, setFooterMode] = useState<'default' | 'pick'>('default');
+  const [selectedFrameTemplateId, setSelectedFrameTemplateId] = useState('');
 
   const returnPath = id ? `/posts/${id}/edit` : '/posts/new';
 
@@ -72,6 +75,19 @@ export default function PostCreatorPage() {
   });
 
   const watched = watch();
+
+  useEffect(() => {
+    if (!session?.access_token || !watched.branch_id) {
+      setFrameTemplates([]);
+      return;
+    }
+    apiFetch<{ templates: BrandFrameTemplate[] }>(
+      `/api/frame-templates?branch_id=${watched.branch_id}`,
+      { token: session.access_token },
+    )
+      .then((r) => setFrameTemplates(r.templates))
+      .catch(() => setFrameTemplates([]));
+  }, [session, watched.branch_id]);
 
   useEffect(() => {
     const pick = location.state as GalleryPickState | null;
@@ -216,6 +232,11 @@ export default function PostCreatorPage() {
       alert('Selecciona al menos 1 foto de la galería');
       return;
     }
+    if (footerMode === 'pick' && !selectedFrameTemplateId) {
+      alert('Selecciona una plantilla de footer o usa el footer por defecto');
+      return;
+    }
+    const usesGalleryFrame = imageMode === 'gallery_pick' || imageMode === 'gallery_auto';
     setImgLoading(true);
     try {
       const slugMap: Record<string, string> = {
@@ -240,6 +261,7 @@ export default function PostCreatorPage() {
           cta: watched.cta || POLLON_CONTACT.defaultCta,
           brand_color: branch.brand_color || '#c50000',
           post_id: id,
+          frame_template_id: usesGalleryFrame && footerMode === 'pick' ? selectedFrameTemplateId : undefined,
         }),
       });
       setImageUrl(result.url);
@@ -422,6 +444,57 @@ export default function PostCreatorPage() {
                   </div>
                 </label>
               </div>
+
+              {(imageMode === 'gallery_pick' || imageMode === 'gallery_auto') && (
+                <div className="border-t pt-3 space-y-2">
+                  <Label className="font-semibold">Footer de la imagen</Label>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="footerMode"
+                      checked={footerMode === 'default'}
+                      onChange={() => setFooterMode('default')}
+                      className="mt-1"
+                    />
+                    <div>
+                      <span className="text-sm font-medium">Footer por defecto</span>
+                      <p className="text-xs text-gray-500">Usa la plantilla configurada para la sucursal en Header y Footer.</p>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="footerMode"
+                      checked={footerMode === 'pick'}
+                      onChange={() => setFooterMode('pick')}
+                      className="mt-1"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-medium">Seleccionar footer</span>
+                      <p className="text-xs text-gray-500 mb-2">Elige una plantilla específica para esta publicación.</p>
+                      {footerMode === 'pick' && (
+                        <select
+                          className="w-full border rounded-md p-2 text-sm bg-white"
+                          value={selectedFrameTemplateId}
+                          onChange={(e) => setSelectedFrameTemplateId(e.target.value)}
+                        >
+                          <option value="">— Elige plantilla —</option>
+                          {frameTemplates.map((tpl) => (
+                            <option key={tpl.id} value={tpl.id}>
+                              {tpl.name}{tpl.is_default ? ' (por defecto)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {footerMode === 'pick' && frameTemplates.length === 0 && (
+                        <p className="text-xs text-amber-700 mt-1">
+                          No hay plantillas. Créalas en el menú Header y Footer.
+                        </p>
+                      )}
+                    </div>
+                  </label>
+                </div>
+              )}
 
               {imageMode === 'gallery_pick' && (
                 <GallerySelectionBar

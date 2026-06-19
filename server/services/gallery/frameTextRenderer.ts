@@ -1,29 +1,72 @@
 import { readFile } from 'fs/promises';
+import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import axios from 'axios';
 import opentype from 'opentype.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const FONT_NAME = 'DejaVuSans-Bold.ttf';
 
 let fontCache: opentype.Font | null = null;
 
-const FONT_PATHS = [
-  join(__dirname, '../../../templates/fonts/DejaVuSans-Bold.ttf'),
-  join(process.cwd(), 'templates/fonts/DejaVuSans-Bold.ttf'),
-];
+function getFontSearchPaths(): string[] {
+  const cwd = process.cwd();
+  return [
+    join(cwd, 'api/fonts', FONT_NAME),
+    join(cwd, 'templates/fonts', FONT_NAME),
+    '/var/task/api/fonts/' + FONT_NAME,
+    '/var/task/templates/fonts/' + FONT_NAME,
+    join(__dirname, '../../../api/fonts', FONT_NAME),
+    join(__dirname, '../../../templates/fonts', FONT_NAME),
+    join(__dirname, '../../assets/fonts', FONT_NAME),
+    join(__dirname, '../../../../templates/fonts', FONT_NAME),
+    join(__dirname, '../../../../api/fonts', FONT_NAME),
+  ];
+}
 
-async function loadFont(): Promise<opentype.Font> {
-  if (fontCache) return fontCache;
-  for (const p of FONT_PATHS) {
+async function loadFontFromDisk(): Promise<opentype.Font | null> {
+  for (const p of getFontSearchPaths()) {
     try {
+      if (!existsSync(p)) continue;
       const buf = await readFile(p);
-      fontCache = opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
-      return fontCache;
+      return opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
     } catch {
       continue;
     }
   }
-  throw new Error('Fuente DejaVuSans-Bold.ttf no encontrada en templates/fonts/');
+  return null;
+}
+
+async function loadFontFromRemote(): Promise<opentype.Font> {
+  const urls = [
+    'https://github.com/GravityPDF/mpdf-core-fonts/raw/master/DejaVuSans-Bold.ttf',
+    'https://raw.githubusercontent.com/GravityPDF/mpdf-core-fonts/master/DejaVuSans-Bold.ttf',
+  ];
+  for (const url of urls) {
+    try {
+      const { data } = await axios.get(url, {
+        responseType: 'arraybuffer',
+        timeout: 20000,
+        maxContentLength: 2 * 1024 * 1024,
+      });
+      return opentype.parse(data);
+    } catch {
+      continue;
+    }
+  }
+  throw new Error('No se pudo cargar la fuente para el footer. Intenta de nuevo en unos segundos.');
+}
+
+async function loadFont(): Promise<opentype.Font> {
+  if (fontCache) return fontCache;
+  const fromDisk = await loadFontFromDisk();
+  if (fromDisk) {
+    fontCache = fromDisk;
+    return fontCache;
+  }
+  fontCache = await loadFontFromRemote();
+  return fontCache;
 }
 
 export interface TextPathOptions {
@@ -33,7 +76,6 @@ export interface TextPathOptions {
   anchor?: 'start' | 'middle' | 'end';
 }
 
-/** Convierte texto a path SVG (funciona en Vercel sin fuentes del sistema) */
 export async function textToSvgPath(text: string, options: TextPathOptions): Promise<string> {
   const clean = text.replace(/[^\x20-\x7E]/g, '').trim() || ' ';
   const font = await loadFont();
@@ -50,7 +92,6 @@ export async function textToSvgPath(text: string, options: TextPathOptions): Pro
   return path.toPathData(2);
 }
 
-/** Trunca texto para que quepa en maxWidth px */
 export async function fitTextToWidth(
   text: string,
   maxWidth: number,

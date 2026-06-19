@@ -129,7 +129,10 @@ export function templateRowToConfig(
   };
 }
 
-export async function resolveFrameConfig(branchId?: string): Promise<FrameConfig> {
+export async function resolveFrameConfig(
+  branchId?: string,
+  frameTemplateId?: string | null,
+): Promise<FrameConfig> {
   if (!branchId) return defaultFrameConfig();
 
   const supabase = getSupabaseAdmin();
@@ -140,6 +143,16 @@ export async function resolveFrameConfig(branchId?: string): Promise<FrameConfig
     .maybeSingle();
 
   if (branchError || !branch) return defaultFrameConfig();
+
+  if (frameTemplateId) {
+    const { data: picked } = await supabase
+      .from('brand_frame_templates')
+      .select('*')
+      .eq('id', frameTemplateId)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (picked) return templateRowToConfig(picked as FrameTemplateRow, branch);
+  }
 
   let template: FrameTemplateRow | null = null;
 
