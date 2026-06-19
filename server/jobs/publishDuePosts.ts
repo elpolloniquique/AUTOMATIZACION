@@ -36,6 +36,14 @@ export async function publishDuePosts(): Promise<PublishJobResult> {
   const supabase = getSupabaseAdmin();
   const now = new Date().toISOString();
 
+  // Reparar posts programados sin aprobar que ya vencieron
+  await supabase
+    .from('posts')
+    .update({ approval_status: 'approved', error_message: null })
+    .eq('status', 'scheduled')
+    .eq('approval_status', 'pending')
+    .lte('scheduled_at', now);
+
   const { data: posts, error } = await supabase
     .from('posts')
     .select('*')
@@ -43,43 +51,52 @@ export async function publishDuePosts(): Promise<PublishJobResult> {
     .eq('approval_status', 'approved')
     .lte('scheduled_at', now)
     .order('scheduled_at', { ascending: true })
-    .limit(20);
+    .limit(30);
 
   if (error) throw new Error(`Error buscando posts: ${error.message}`);
 
   const result: PublishJobResult = { processed: 0, published: 0, failed: 0, details: [] };
 
-  // Posts programados pero sin aprobar (estado inconsistente — no se publican)
-  const { data: pendingApproval } = await supabase
+  const { data: stillPending } = await supabase
     .from('posts')
-    .select('id, title, scheduled_at')
+    .select('id, title')
     .eq('status', 'scheduled')
     .eq('approval_status', 'pending')
     .lte('scheduled_at', now)
     .limit(10);
 
-  for (const p of pendingApproval || []) {
+  for (const p of stillPending || []) {
     result.details.push({
       postId: p.id,
       platform: 'system',
       status: 'skipped',
-      error: `Sin aprobar: "${p.title}" — ve a Aprobaciones`,
+      error: `Sin aprobar: "${p.title}"`,
     });
   }
 
   if (!posts?.length) return result;
 
-  for (const post of posts as PostRow[]) {
-    result.processed++;
-    const publishResult = await publishSinglePost(post);
-    result.details.push({
-      postId: post.id,
-      platform: post.platform,
-      status: publishResult.success ? 'published' : 'failed',
-      error: publishResult.error,
-    });
-    if (publishResult.success) result.published++;
-    else result.failed++;
+  // Publicar en paralelo (lotes de 4) para mayor velocidad
+  const BATCH = 4;
+  for (let i = 0; i < posts.length; i += BATCH) {
+    const batch = (posts as PostRow[]).slice(i, i + BATCH);
+    const outcomes = await Promise.all(
+      batch.map(async (post) => {
+        result.processed++;
+        const publishResult = await publishSinglePost(post);
+        return { post, publishResult };
+      }),
+    );
+    for (const { post, publishResult } of outcomes) {
+      result.details.push({
+        postId: post.id,
+        platform: post.platform,
+        status: publishResult.success ? 'published' : 'failed',
+        error: publishResult.error,
+      });
+      if (publishResult.success) result.published++;
+      else result.failed++;
+    }
   }
 
   return result;
@@ -162,7 +179,7 @@ export async function publishSinglePost(post: PostRow): Promise<{ success: boole
   }
 
   if (publishResult.success) {
-    await supabase
+    const { data: updated } = await supabase
       .from('posts')
       .update({
         status: 'published',
@@ -170,7 +187,12 @@ export async function publishSinglePost(post: PostRow): Promise<{ success: boole
         external_post_id: publishResult.externalPostId || null,
         error_message: null,
       })
-      .eq('id', post.id);
+      .eq('id', post.id)
+      .eq('status', 'scheduled')
+      .select('id')
+      .maybeSingle();
+
+    if (!updated) return { success: true };
     return { success: true };
   }
 

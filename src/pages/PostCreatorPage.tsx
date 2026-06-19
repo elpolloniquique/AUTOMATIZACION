@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SocialPreview } from '@/components/SocialPreview';
 import { HashtagEditor } from '@/components/HashtagEditor';
 import { GallerySelectionBar } from '@/components/GallerySelectionBar';
-import type { Branch, Platform, PostType, ImageGenerateMode, ImageGenerateResult, MediaGalleryItem, Post, ApprovalStatus, PostStatus } from '@/types';
+import type { Branch, Platform, PostType, ImageGenerateMode, ImageGenerateResult, MediaGalleryItem, Post } from '@/types';
 import { PLATFORM_LABELS, POST_TYPE_LABELS } from '@/types';
 import { POLLON_CONTACT } from '@/constants/pollonBrand';
 
@@ -256,72 +256,63 @@ export default function PostCreatorPage() {
     || profile?.role === 'admin_sucursal'
     || profile?.role === 'aprobador';
 
-  async function onSubmit(data: PostForm, submitForApproval = false) {
+  async function onSubmit(data: PostForm, schedule = false) {
+    if (!session?.access_token || !profile?.id) return;
+    if (schedule && !data.scheduled_at) {
+      alert('Selecciona fecha y hora para programar la publicación');
+      return;
+    }
+    if (schedule && !imageUrl && data.platform !== 'tiktok') {
+      alert('Genera o selecciona una imagen antes de programar');
+      return;
+    }
+
     setSaving(true);
     const hashtags = data.hashtags?.split(',').map((h) => h.trim().replace(/^#/, '')).filter(Boolean) || [];
 
-    let status: PostStatus;
-    let approvalStatus: ApprovalStatus;
+    try {
+      const result = await apiFetch<{
+        message: string;
+        published_now?: boolean;
+        publish_result?: { success: boolean; error?: string };
+      }>('/api/posts/save', {
+        method: 'POST',
+        token: session.access_token,
+        body: JSON.stringify({
+          id: id || undefined,
+          branch_id: data.branch_id,
+          platform: data.platform,
+          post_type: data.post_type,
+          title: data.title,
+          caption: data.caption || null,
+          cta: data.cta || null,
+          hashtags,
+          scheduled_at: fromDatetimeLocalValue(data.scheduled_at),
+          price: data.price || null,
+          product_name: data.product_name || null,
+          generated_image_url: imageUrl || null,
+          media_urls: mediaUrls.length ? mediaUrls : null,
+          gallery_item_ids: selectedGallery.length ? selectedGallery.map((g) => g.id) : null,
+          image_mode: imageMode,
+          schedule,
+          preserve_status: !schedule ? originalPost?.status : undefined,
+          preserve_approval_status: !schedule ? originalPost?.approval_status : undefined,
+        }),
+      });
 
-    if (submitForApproval && canAutoApprove) {
-      status = 'scheduled';
-      approvalStatus = 'approved';
-    } else if (submitForApproval) {
-      status = 'pending_approval';
-      approvalStatus = 'pending';
-    } else if (originalPost?.status === 'scheduled' || originalPost?.status === 'published') {
-      status = originalPost.status;
-      approvalStatus = originalPost.approval_status;
-    } else {
-      status = 'draft';
-      approvalStatus = originalPost?.approval_status === 'approved' ? 'approved' : 'pending';
-    }
-
-    const payload = {
-      branch_id: data.branch_id,
-      created_by: profile?.id,
-      platform: data.platform,
-      post_type: data.post_type,
-      title: data.title,
-      caption: data.caption,
-      cta: data.cta,
-      hashtags,
-      scheduled_at: fromDatetimeLocalValue(data.scheduled_at),
-      price: data.price,
-      product_name: data.product_name,
-      generated_image_url: imageUrl || null,
-      media_urls: mediaUrls.length ? mediaUrls : null,
-      gallery_item_ids: selectedGallery.length ? selectedGallery.map((g) => g.id) : null,
-      image_mode: imageMode,
-      status,
-      approval_status: approvalStatus,
-    };
-
-    const { data: saved, error } = id
-      ? await supabase.from('posts').update(payload).eq('id', id).select('id').single()
-      : await supabase.from('posts').insert(payload).select('id').single();
-
-    if (!error && saved && submitForApproval && canAutoApprove && session?.access_token) {
-      try {
-        const result = await apiFetch<{ published_now?: boolean; publish_result?: { success: boolean; error?: string } }>(
-          `/api/posts/${saved.id}/approve`,
-          { method: 'POST', token: session.access_token },
-        );
-        if (result.publish_result && !result.publish_result.success) {
-          alert(`Publicación aprobada pero falló al publicar: ${result.publish_result.error || 'Error desconocido'}`);
-        } else if (result.published_now) {
-          alert('¡Publicación aprobada y publicada en Facebook!');
-        }
-      } catch (approveErr) {
-        alert(approveErr instanceof Error ? approveErr.message : 'Error al aprobar');
+      if (result.publish_result && !result.publish_result.success) {
+        alert(result.message);
+      } else if (result.published_now) {
+        alert(result.message);
+      } else if (schedule) {
+        alert(result.message);
       }
-    }
 
-    setSaving(false);
-    if (error) {
-      alert(error.message);
-    } else {
-      navigate(submitForApproval && !canAutoApprove ? '/approvals' : '/history');
+      navigate(schedule && !canAutoApprove ? '/approvals' : '/history');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al guardar');
+    } finally {
+      setSaving(false);
     }
   }
 

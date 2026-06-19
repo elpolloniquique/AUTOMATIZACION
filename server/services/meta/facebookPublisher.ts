@@ -32,7 +32,7 @@ export async function publishToFacebook(params: FacebookPublishParams): Promise<
           caption: message,
           access_token: accessToken,
         },
-        timeout: 30000,
+        timeout: 20000,
       }
     );
 
@@ -83,12 +83,12 @@ function extractAxiosError(err: unknown): string {
   return err instanceof Error ? err.message : 'Error desconocido';
 }
 
-export async function publishWithRetry(params: FacebookPublishParams, maxRetries = 2): Promise<PublishResult> {
+export async function publishWithRetry(params: FacebookPublishParams, maxRetries = 1): Promise<PublishResult> {
   let lastResult: PublishResult = { success: false, error: 'Sin intentos' };
   for (let i = 0; i <= maxRetries; i++) {
     lastResult = await publishToFacebook(params);
     if (lastResult.success) return lastResult;
-    if (i < maxRetries) await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
+    if (i < maxRetries) await new Promise((r) => setTimeout(r, 800));
   }
   return lastResult;
 }

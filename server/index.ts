@@ -17,6 +17,7 @@ import { testInstagramConnection } from './services/meta/instagramPublisher.js';
 import { testGoogleBusinessConnection } from './services/google-business/googleBusinessPublisher.js';
 import { generateTikTokScript } from './services/tiktok/tiktokPublisher.js';
 import { getSupabaseAdmin } from './utils/supabase.js';
+import { saveAndSchedulePost, canAutoApprove, isPublishDue } from './services/posts/postScheduleService.js';
 import { z } from 'zod';
 
 function zodErrorMessage(result: z.SafeParseError<unknown>) {
@@ -69,6 +70,68 @@ app.post('/api/cron/publish-due-posts', cronGuard, asyncHandler(async (_req, res
 app.get('/api/cron/publish-due-posts', cronGuard, asyncHandler(async (_req, res) => {
   const result = await publishDuePosts();
   res.json({ success: true, ...result });
+}));
+
+app.post('/api/posts/save', authMiddleware, asyncHandler(async (req, res) => {
+  const schema = z.object({
+    id: z.string().uuid().optional(),
+    branch_id: z.string().uuid(),
+    platform: z.enum(['facebook', 'instagram', 'tiktok', 'google_business']),
+    post_type: z.string(),
+    title: z.string().min(3),
+    caption: z.string().optional().nullable(),
+    cta: z.string().optional().nullable(),
+    hashtags: z.array(z.string()).optional(),
+    scheduled_at: z.string().datetime().optional().nullable(),
+    price: z.string().optional().nullable(),
+    product_name: z.string().optional().nullable(),
+    generated_image_url: z.string().url().optional().nullable(),
+    media_urls: z.array(z.string()).optional().nullable(),
+    gallery_item_ids: z.array(z.string().uuid()).optional().nullable(),
+    image_mode: z.string().optional().nullable(),
+    schedule: z.boolean(),
+    preserve_status: z.string().optional(),
+    preserve_approval_status: z.string().optional(),
+  });
+
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: zodErrorMessage(parsed) });
+
+  assertBranchAccess(req.user!, parsed.data.branch_id);
+
+  if (parsed.data.schedule && !parsed.data.scheduled_at) {
+    return res.status(400).json({ error: 'Indica fecha y hora para programar la publicación' });
+  }
+
+  try {
+    const result = await saveAndSchedulePost({
+      id: parsed.data.id,
+      branch_id: parsed.data.branch_id,
+      created_by: req.user!.id,
+      platform: parsed.data.platform,
+      post_type: parsed.data.post_type,
+      title: parsed.data.title,
+      caption: parsed.data.caption,
+      cta: parsed.data.cta,
+      hashtags: parsed.data.hashtags,
+      scheduled_at: parsed.data.scheduled_at,
+      price: parsed.data.price,
+      product_name: parsed.data.product_name,
+      generated_image_url: parsed.data.generated_image_url,
+      media_urls: parsed.data.media_urls,
+      gallery_item_ids: parsed.data.gallery_item_ids,
+      image_mode: parsed.data.image_mode,
+      schedule: parsed.data.schedule,
+      userRole: req.user!.role,
+      userId: req.user!.id,
+      preserveStatus: parsed.data.preserve_status
+        ? { status: parsed.data.preserve_status, approval_status: parsed.data.preserve_approval_status || 'pending' }
+        : null,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : 'Error al guardar' });
+  }
 }));
 
 app.post('/api/ai/generate', authMiddleware, asyncHandler(async (req, res) => {
@@ -274,6 +337,8 @@ app.post('/api/posts/:id/republish', authMiddleware, asyncHandler(async (req, re
     ? new Date(parsed.data.scheduled_at).toISOString()
     : null;
 
+  const autoApprove = canAutoApprove(req.user!.role);
+
   const { data: clone, error: insertError } = await supabase
     .from('posts')
     .insert({
@@ -293,8 +358,9 @@ app.post('/api/posts/:id/republish', authMiddleware, asyncHandler(async (req, re
       price: original.price,
       product_name: original.product_name,
       scheduled_at: scheduledAt,
-      status: scheduledAt ? 'pending_approval' : 'draft',
-      approval_status: 'pending',
+      status: scheduledAt ? (autoApprove ? 'scheduled' : 'pending_approval') : 'draft',
+      approval_status: scheduledAt && autoApprove ? 'approved' : 'pending',
+      approved_by: scheduledAt && autoApprove ? req.user!.id : null,
       source_post_id: original.id,
     })
     .select()
@@ -352,7 +418,7 @@ app.post('/api/posts/:id/approve', authMiddleware, roleGuard('super_admin', 'adm
     return;
   }
 
-  const isDue = !post.scheduled_at || new Date(post.scheduled_at) <= new Date();
+  const isDue = isPublishDue(post.scheduled_at);
   if (isDue) {
     const publishResult = await publishSinglePost(post);
     res.json({ success: true, published_now: true, publish_result: publishResult });
