@@ -13,6 +13,23 @@ export function formatDate(date: string | null | undefined): string {
   });
 }
 
+/** Convierte ISO UTC a valor para input datetime-local (hora local del navegador). */
+export function toDatetimeLocalValue(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Convierte datetime-local del navegador a ISO UTC para guardar en BD. */
+export function fromDatetimeLocalValue(value: string | undefined | null): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
 export function getStatusColor(status: string): string {
   const colors: Record<string, string> = {
     draft: 'bg-gray-100 text-gray-700',

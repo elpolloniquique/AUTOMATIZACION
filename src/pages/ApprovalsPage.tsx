@@ -35,10 +35,15 @@ export default function ApprovalsPage() {
     if (!session?.access_token) return;
     setLoading(postId);
     try {
-      await apiFetch(`/api/posts/${postId}/approve`, {
-        method: 'POST',
-        token: session.access_token,
-      });
+      const result = await apiFetch<{ published_now?: boolean; publish_result?: { success: boolean; error?: string } }>(
+        `/api/posts/${postId}/approve`,
+        { method: 'POST', token: session.access_token },
+      );
+      if (result.published_now && result.publish_result?.success) {
+        alert('Aprobada y publicada en la red social.');
+      } else if (result.published_now && result.publish_result && !result.publish_result.success) {
+        alert(`Aprobada pero falló al publicar: ${result.publish_result.error || 'Error'}`);
+      }
       loadPosts();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error');

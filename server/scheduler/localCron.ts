@@ -5,7 +5,7 @@
 import cron from 'node-cron';
 import { publishDuePosts } from '../jobs/publishDuePosts.js';
 
-const CRON_SCHEDULE = '*/15 * * * *'; // cada 15 minutos
+const CRON_SCHEDULE = '*/5 * * * *'; // cada 5 minutos
 
 export function startLocalCron() {
   if (process.env.NODE_ENV === 'production') {

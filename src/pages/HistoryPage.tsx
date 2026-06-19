@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { Post, PostLog, Platform } from '@/types';
 import { PLATFORM_LABELS, STATUS_LABELS } from '@/types';
-import { RefreshCw, Pencil, Copy, Calendar, ImageIcon } from 'lucide-react';
+import { RefreshCw, Pencil, Copy, Calendar, ImageIcon, Send } from 'lucide-react';
 
 type Tab = 'publications' | 'logs';
 
@@ -25,6 +25,7 @@ export default function HistoryPage() {
   const [republishPost, setRepublishPost] = useState<Post | null>(null);
   const [republishDate, setRepublishDate] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [publishing, setPublishing] = useState<string | null>(null);
 
   useEffect(() => {
     loadPosts();
@@ -69,6 +70,31 @@ export default function HistoryPage() {
       setRetrying(null);
     }
   }
+
+  async function handlePublishNow(postId: string) {
+    if (!session?.access_token) return;
+    if (!confirm('¿Publicar ahora en Facebook?')) return;
+    setPublishing(postId);
+    try {
+      const result = await apiFetch<{ success: boolean; error?: string }>(
+        `/api/posts/${postId}/publish-now`,
+        { method: 'POST', token: session.access_token },
+      );
+      if (!result.success) {
+        alert(result.error || 'No se pudo publicar');
+      }
+      loadPosts();
+      loadLogs();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al publicar');
+    } finally {
+      setPublishing(null);
+    }
+  }
+
+  const canPublish = profile?.role === 'super_admin'
+    || profile?.role === 'admin_sucursal'
+    || profile?.role === 'aprobador';
 
   async function handleRepublish() {
     if (!republishPost || !session?.access_token) return;
@@ -163,6 +189,12 @@ export default function HistoryPage() {
                     {post.scheduled_at && post.status !== 'published' && (
                       <p>Programada: {formatDate(post.scheduled_at)}</p>
                     )}
+                    {post.status === 'scheduled' && post.approval_status === 'pending' && (
+                      <p className="text-amber-600 font-medium">⚠ Sin aprobar — no se publicará sola</p>
+                    )}
+                    {post.error_message && (
+                      <p className="text-red-600 truncate" title={post.error_message}>{post.error_message}</p>
+                    )}
                     {post.media_urls && post.media_urls.length > 1 && (
                       <p className="text-green-600">{post.media_urls.length} fotos en collage</p>
                     )}
@@ -192,6 +224,16 @@ export default function HistoryPage() {
                       <Button size="sm" variant="outline" onClick={() => handleRetry(post.id)} disabled={retrying === post.id}>
                         <RefreshCw className="w-3 h-3 mr-1" />
                         Reintentar
+                      </Button>
+                    )}
+                    {canPublish && (post.status === 'scheduled' || post.status === 'failed') && (
+                      <Button
+                        size="sm"
+                        onClick={() => handlePublishNow(post.id)}
+                        disabled={publishing === post.id}
+                      >
+                        <Send className="w-3 h-3 mr-1" />
+                        {publishing === post.id ? 'Publicando...' : 'Publicar ahora'}
                       </Button>
                     )}
                   </div>

@@ -43,11 +43,29 @@ export async function publishDuePosts(): Promise<PublishJobResult> {
     .eq('approval_status', 'approved')
     .lte('scheduled_at', now)
     .order('scheduled_at', { ascending: true })
-    .limit(5);
+    .limit(20);
 
   if (error) throw new Error(`Error buscando posts: ${error.message}`);
 
   const result: PublishJobResult = { processed: 0, published: 0, failed: 0, details: [] };
+
+  // Posts programados pero sin aprobar (estado inconsistente — no se publican)
+  const { data: pendingApproval } = await supabase
+    .from('posts')
+    .select('id, title, scheduled_at')
+    .eq('status', 'scheduled')
+    .eq('approval_status', 'pending')
+    .lte('scheduled_at', now)
+    .limit(10);
+
+  for (const p of pendingApproval || []) {
+    result.details.push({
+      postId: p.id,
+      platform: 'system',
+      status: 'skipped',
+      error: `Sin aprobar: "${p.title}" — ve a Aprobaciones`,
+    });
+  }
 
   if (!posts?.length) return result;
 
@@ -76,7 +94,7 @@ export async function publishSinglePost(post: PostRow): Promise<{ success: boole
     .eq('branch_id', post.branch_id)
     .eq('platform', post.platform)
     .eq('is_connected', true)
-    .single();
+    .maybeSingle();
 
   const account = accounts as SocialAccount | null;
   const imageUrl = post.generated_image_url || post.media_url;

@@ -66,6 +66,11 @@ app.post('/api/cron/publish-due-posts', cronGuard, asyncHandler(async (_req, res
   res.json({ success: true, ...result });
 }));
 
+app.get('/api/cron/publish-due-posts', cronGuard, asyncHandler(async (_req, res) => {
+  const result = await publishDuePosts();
+  res.json({ success: true, ...result });
+}));
+
 app.post('/api/ai/generate', authMiddleware, asyncHandler(async (req, res) => {
   const schema = z.object({
     branch_id: z.string().uuid(),
@@ -311,7 +316,11 @@ app.post('/api/posts/:id/retry', authMiddleware, roleGuard('super_admin', 'admin
   const { data: post, error } = await supabase.from('posts').select('*').eq('id', postId).single();
   if (error || !post) return res.status(404).json({ error: 'Publicación no encontrada' });
 
-  await supabase.from('posts').update({ status: 'scheduled', error_message: null }).eq('id', post.id);
+  await supabase.from('posts').update({
+    status: 'scheduled',
+    approval_status: 'approved',
+    error_message: null,
+  }).eq('id', post.id);
   const result = await publishSinglePost(post);
   res.json(result);
 }));
@@ -328,6 +337,7 @@ app.post('/api/posts/:id/approve', authMiddleware, roleGuard('super_admin', 'adm
       approval_status: 'approved',
       approved_by: req.user!.id,
       status: 'scheduled',
+      error_message: null,
     })
     .eq('id', postId);
 
@@ -335,7 +345,48 @@ app.post('/api/posts/:id/approve', authMiddleware, roleGuard('super_admin', 'adm
     res.status(500).json({ error: error.message });
     return;
   }
-  res.json({ success: true });
+
+  const { data: post } = await supabase.from('posts').select('*').eq('id', postId).single();
+  if (!post) {
+    res.json({ success: true, published_now: false });
+    return;
+  }
+
+  const isDue = !post.scheduled_at || new Date(post.scheduled_at) <= new Date();
+  if (isDue) {
+    const publishResult = await publishSinglePost(post);
+    res.json({ success: true, published_now: true, publish_result: publishResult });
+    return;
+  }
+
+  res.json({ success: true, published_now: false });
+}));
+
+app.post('/api/posts/:id/publish-now', authMiddleware, roleGuard('super_admin', 'admin_sucursal', 'aprobador'), asyncHandler(async (req, res) => {
+  const supabase = getSupabaseAdmin();
+  const postId = String(req.params.id);
+  const branchId = await getPostBranchId(supabase, postId);
+  assertBranchAccess(req.user!, branchId);
+
+  const { data: post, error } = await supabase.from('posts').select('*').eq('id', postId).single();
+  if (error || !post) return res.status(404).json({ error: 'Publicación no encontrada' });
+
+  if (post.status === 'published') {
+    return res.status(400).json({ error: 'Esta publicación ya fue publicada' });
+  }
+
+  await supabase
+    .from('posts')
+    .update({
+      approval_status: 'approved',
+      approved_by: req.user!.id,
+      status: 'scheduled',
+      error_message: null,
+    })
+    .eq('id', postId);
+
+  const publishResult = await publishSinglePost({ ...post, approval_status: 'approved', status: 'scheduled' });
+  res.json(publishResult);
 }));
 
 app.post('/api/posts/:id/reject', authMiddleware, roleGuard('super_admin', 'admin_sucursal', 'aprobador'), asyncHandler(async (req, res) => {

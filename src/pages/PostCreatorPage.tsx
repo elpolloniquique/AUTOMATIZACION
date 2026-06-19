@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { Sparkles, Image, Save } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
-import { apiFetch } from '@/lib/utils';
+import { apiFetch, fromDatetimeLocalValue, toDatetimeLocalValue } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SocialPreview } from '@/components/SocialPreview';
 import { HashtagEditor } from '@/components/HashtagEditor';
 import { GallerySelectionBar } from '@/components/GallerySelectionBar';
-import type { Branch, Platform, PostType, ImageGenerateMode, ImageGenerateResult, MediaGalleryItem } from '@/types';
+import type { Branch, Platform, PostType, ImageGenerateMode, ImageGenerateResult, MediaGalleryItem, Post, ApprovalStatus, PostStatus } from '@/types';
 import { PLATFORM_LABELS, POST_TYPE_LABELS } from '@/types';
 import { POLLON_CONTACT } from '@/constants/pollonBrand';
 
@@ -55,6 +55,7 @@ export default function PostCreatorPage() {
   const [imagePrompt, setImagePrompt] = useState('');
   const [selectedGallery, setSelectedGallery] = useState<MediaGalleryItem[]>([]);
   const [lastMatch, setLastMatch] = useState<ImageGenerateResult | null>(null);
+  const [originalPost, setOriginalPost] = useState<Pick<Post, 'status' | 'approval_status'> | null>(null);
   const [openAiReady, setOpenAiReady] = useState<boolean | null>(null);
   const [aiProvider, setAiProvider] = useState<string | null>(null);
   const [aiHint, setAiHint] = useState<string | null>(null);
@@ -119,12 +120,13 @@ export default function PostCreatorPage() {
         caption: data.caption || '',
         cta: data.cta || '',
         hashtags: data.hashtags?.join(', ') || '',
-        scheduled_at: data.scheduled_at?.slice(0, 16) || '',
+        scheduled_at: toDatetimeLocalValue(data.scheduled_at),
         price: data.price || '',
         product_name: data.product_name || '',
       });
       setImageUrl(data.generated_image_url || data.media_url || '');
       setMediaUrls(data.media_urls || []);
+      setOriginalPost({ status: data.status, approval_status: data.approval_status });
       if (data.image_mode) setImageMode(data.image_mode as ImageGenerateMode);
 
       const galleryIds = data.gallery_item_ids as string[] | null;
@@ -250,9 +252,31 @@ export default function PostCreatorPage() {
     }
   }
 
+  const canAutoApprove = profile?.role === 'super_admin'
+    || profile?.role === 'admin_sucursal'
+    || profile?.role === 'aprobador';
+
   async function onSubmit(data: PostForm, submitForApproval = false) {
     setSaving(true);
     const hashtags = data.hashtags?.split(',').map((h) => h.trim().replace(/^#/, '')).filter(Boolean) || [];
+
+    let status: PostStatus;
+    let approvalStatus: ApprovalStatus;
+
+    if (submitForApproval && canAutoApprove) {
+      status = 'scheduled';
+      approvalStatus = 'approved';
+    } else if (submitForApproval) {
+      status = 'pending_approval';
+      approvalStatus = 'pending';
+    } else if (originalPost?.status === 'scheduled' || originalPost?.status === 'published') {
+      status = originalPost.status;
+      approvalStatus = originalPost.approval_status;
+    } else {
+      status = 'draft';
+      approvalStatus = originalPost?.approval_status === 'approved' ? 'approved' : 'pending';
+    }
+
     const payload = {
       branch_id: data.branch_id,
       created_by: profile?.id,
@@ -262,26 +286,42 @@ export default function PostCreatorPage() {
       caption: data.caption,
       cta: data.cta,
       hashtags,
-      scheduled_at: data.scheduled_at ? new Date(data.scheduled_at).toISOString() : null,
+      scheduled_at: fromDatetimeLocalValue(data.scheduled_at),
       price: data.price,
       product_name: data.product_name,
       generated_image_url: imageUrl || null,
       media_urls: mediaUrls.length ? mediaUrls : null,
       gallery_item_ids: selectedGallery.length ? selectedGallery.map((g) => g.id) : null,
       image_mode: imageMode,
-      status: submitForApproval ? 'pending_approval' : 'draft',
-      approval_status: 'pending',
+      status,
+      approval_status: approvalStatus,
     };
 
-    const { error } = id
-      ? await supabase.from('posts').update(payload).eq('id', id)
-      : await supabase.from('posts').insert(payload);
+    const { data: saved, error } = id
+      ? await supabase.from('posts').update(payload).eq('id', id).select('id').single()
+      : await supabase.from('posts').insert(payload).select('id').single();
+
+    if (!error && saved && submitForApproval && canAutoApprove && session?.access_token) {
+      try {
+        const result = await apiFetch<{ published_now?: boolean; publish_result?: { success: boolean; error?: string } }>(
+          `/api/posts/${saved.id}/approve`,
+          { method: 'POST', token: session.access_token },
+        );
+        if (result.publish_result && !result.publish_result.success) {
+          alert(`Publicación aprobada pero falló al publicar: ${result.publish_result.error || 'Error desconocido'}`);
+        } else if (result.published_now) {
+          alert('¡Publicación aprobada y publicada en Facebook!');
+        }
+      } catch (approveErr) {
+        alert(approveErr instanceof Error ? approveErr.message : 'Error al aprobar');
+      }
+    }
 
     setSaving(false);
     if (error) {
       alert(error.message);
     } else {
-      navigate(submitForApproval ? '/approvals' : '/calendar');
+      navigate(submitForApproval && !canAutoApprove ? '/approvals' : '/history');
     }
   }
 
@@ -471,7 +511,7 @@ export default function PostCreatorPage() {
                 <Save className="w-4 h-4 mr-1" /> Guardar borrador
               </Button>
               <Button variant="secondary" onClick={handleSubmit((d) => onSubmit(d, true))} disabled={saving}>
-                Enviar a aprobación
+                {canAutoApprove ? 'Programar publicación' : 'Enviar a aprobación'}
               </Button>
             </div>
           </CardContent>
