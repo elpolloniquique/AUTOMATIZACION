@@ -24,7 +24,7 @@ export interface FrameComposeInput {
 }
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
-  const h = hex.replace('#', '');
+  const h = hex.replace('#', '').slice(0, 6);
   return {
     r: parseInt(h.slice(0, 2), 16) || 197,
     g: parseInt(h.slice(2, 4), 16) || 0,
@@ -55,9 +55,37 @@ function darkenHex(hex: string, factor: number): string {
   return rgbToHex(r * factor, g * factor, b * factor);
 }
 
-/** Extrae color dominante de la comida y lo adapta para header/footer */
+/** Solo hex valido para SVG (evita errores libxml en Vercel) */
+function safeHexColor(hex: string): string {
+  const clean = hex.trim();
+  if (/^#[0-9A-Fa-f]{6}$/.test(clean)) return clean;
+  return FRAME.defaultAccent;
+}
+
+/** SVG ASCII seguro — sin caracteres Unicode que rompen librsvg en Linux/Vercel */
+function svgBuffer(body: string): Buffer {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n${body}`;
+  return Buffer.from(xml, 'utf8');
+}
+
+function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, '');
+}
+
+async function rasterizeSvg(body: string, width: number, height: number): Promise<Buffer> {
+  return sharp(svgBuffer(body), { density: 144 })
+    .resize(width, height, { fit: 'fill' })
+    .png()
+    .toBuffer();
+}
+
 export async function extractSmartAccentColor(photoBuffers: Buffer[], brandFallback = FRAME.defaultAccent): Promise<string> {
-  if (photoBuffers.length === 0) return brandFallback;
+  if (photoBuffers.length === 0) return safeHexColor(brandFallback);
 
   let rSum = 0;
   let gSum = 0;
@@ -65,33 +93,36 @@ export async function extractSmartAccentColor(photoBuffers: Buffer[], brandFallb
   let count = 0;
 
   for (const buf of photoBuffers) {
-    const { data } = await sharp(buf)
-      .resize(100, 100, { fit: 'cover' })
-      .removeAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
+    try {
+      const { data } = await sharp(buf)
+        .resize(100, 100, { fit: 'cover' })
+        .removeAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
 
-    for (let i = 0; i < data.length; i += 3) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const bright = (r + g + b) / 3;
-      const sat = Math.max(r, g, b) - Math.min(r, g, b);
-      if (bright > 235 || bright < 25 || sat < 18) continue;
-      rSum += r;
-      gSum += g;
-      bSum += b;
-      count++;
+      for (let i = 0; i < data.length; i += 3) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const bright = (r + g + b) / 3;
+        const sat = Math.max(r, g, b) - Math.min(r, g, b);
+        if (bright > 235 || bright < 25 || sat < 18) continue;
+        rSum += r;
+        gSum += g;
+        bSum += b;
+        count++;
+      }
+    } catch {
+      continue;
     }
   }
 
-  if (count === 0) return brandFallback;
+  if (count === 0) return safeHexColor(brandFallback);
 
   let r = rSum / count;
   let g = gSum / count;
   let b = bSum / count;
 
-  // Potenciar saturación hacia tonos cálidos (marca pollería)
   const max = Math.max(r, g, b);
   if (max > 0) {
     r = Math.min(255, r * (255 / max) * 0.95);
@@ -101,109 +132,110 @@ export async function extractSmartAccentColor(photoBuffers: Buffer[], brandFallb
 
   let extracted = rgbToHex(r, g, b);
   extracted = darkenHex(extracted, 0.62);
-  let accent = blendHex(brandFallback, extracted, 0.42);
+  let accent = blendHex(safeHexColor(brandFallback), extracted, 0.42);
 
-  // Asegurar contraste con texto blanco
   const { r: ar, g: ag, b: ab } = hexToRgb(accent);
-  if (luminance(ar, ag, ab) > 0.38) {
-    accent = darkenHex(accent, 0.72);
-  }
+  if (luminance(ar, ag, ab) > 0.38) accent = darkenHex(accent, 0.72);
   if (luminance(hexToRgb(accent).r, hexToRgb(accent).g, hexToRgb(accent).b) > 0.32) {
-    accent = blendHex(accent, brandFallback, 0.55);
+    accent = blendHex(accent, safeHexColor(brandFallback), 0.55);
   }
 
-  return accent;
+  return safeHexColor(accent);
 }
 
-function escapeXml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function buildCornerHeaderSvg(accent: string): Buffer {
+function buildCornerHeaderSvg(accent: string): string {
   const { size, cornerSize } = FRAME;
-  return Buffer.from(`
+  const color = safeHexColor(accent);
+  return `
     <svg width="${size}" height="${cornerSize}" xmlns="http://www.w3.org/2000/svg">
-      <polygon points="0,0 ${cornerSize},0 0,${cornerSize}" fill="${accent}"/>
-    </svg>
-  `);
+      <polygon points="0,0 ${cornerSize},0 0,${cornerSize}" fill="${color}"/>
+    </svg>`;
 }
 
-function buildFooterSvg(accent: string): Buffer {
+function buildFooterSvg(accent: string): string {
   const { size, footerH } = FRAME;
+  const color = safeHexColor(accent);
   const phone = escapeXml('+56 9 86925310');
-  const web = escapeXml(POLLON_BRAND.websiteDisplay);
+  const web = escapeXml(POLLON_BRAND.websiteDisplay.replace(/[^\x20-\x7E]/g, '') || 'www.el-pollon.cl');
+  const btnY = Math.round(footerH / 2 - 30);
+  const btnX = Math.round(size / 2 - 152);
+  const rowY = Math.round(footerH / 2 - 20);
+  const webX = size - 290;
 
-  return Buffer.from(`
+  return `
     <svg width="${size}" height="${footerH}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="${size}" height="${footerH}" fill="${accent}"/>
-      <g transform="translate(20, ${Math.round(footerH / 2 - 20)})">
+      <rect width="${size}" height="${footerH}" fill="${color}"/>
+      <g transform="translate(20, ${rowY})">
         <circle cx="20" cy="20" r="20" fill="#25D366"/>
-        <path fill="#fff" d="M20 10c-5.5 0-10 4.5-10 10 0 1.8.5 3.5 1.4 5l-1.3 4.7 4.8-1.3c1.4.8 3 1.3 4.7 1.3 5.5 0 10-4.5 10-10s-4.5-10-10-10zm5.5 14.2c-.3.8-1.4 1.5-2 1.6-.5.1-1.1.2-1.8-.1-.4-.1-1-.3-1.7-.6-3-1.3-4.9-4.3-5.1-4.5-.2-.2-1.1-1.5-1.1-2.9 0-1.4.7-2.1 1-2.4.3-.3.6-.4.9-.4h.7c.2 0 .4-.1.7.5.3.6 1 2.4 1 2.6.1.2.1.4 0 .6l-.3.5c-.1.1-.2.2-.1.4.1.2.5 1 1.1 1.5.7.7 1.4 1 1.6 1.1.2.1.4.1.5-.1.2-.2.6-.7.8-.9.2-.2.4-.2.6-.1.3.1 1.7.8 2 1 .3.1.5.2.6.3.1.1.1.7-.2 1.5z"/>
-        <text x="50" y="27" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="22" font-weight="700">${phone}</text>
+        <path fill="#ffffff" d="M20 10a10 10 0 00-10 10c0 1.8.5 3.5 1.4 5l-1.3 4.7 4.8-1.3a10 10 0 0014.1-9.4A10 10 0 0020 10z"/>
+        <text x="50" y="27" fill="#ffffff" font-family="Arial,sans-serif" font-size="22" font-weight="700">${phone}</text>
       </g>
-      <g transform="translate(${Math.round(size / 2 - 152)}, ${Math.round(footerH / 2 - 30)})">
-        <rect width="304" height="60" rx="30" fill="#fff"/>
-        <g transform="translate(18, 14)">
-          <circle cx="16" cy="16" r="16" fill="${accent}"/>
-          <path fill="#fff" d="M10 22h1.5l.8-2.5h3.4l.8 2.5H18l-2.5-8h-3L10 22zm3.5-9.5c1 0 1.8.8 1.8 1.8h-3.6c0-1 .8-1.8 1.8-1.8z"/>
-          <circle cx="22" cy="22" r="3" fill="#fff"/>
-          <circle cx="10" cy="22" r="3" fill="#fff"/>
-        </g>
-        <text x="168" y="38" text-anchor="middle" fill="${accent}" font-family="Arial,Helvetica,sans-serif" font-size="22" font-weight="900">¡PIDE AHORA!</text>
+      <g transform="translate(${btnX}, ${btnY})">
+        <rect width="304" height="60" rx="30" fill="#ffffff"/>
+        <circle cx="34" cy="30" r="16" fill="${color}"/>
+        <path fill="#ffffff" d="M28 36h2l1-3h4l1 3h2l-3-9h-4l-3 9zm4-11a2 2 0 110 4 2 2 0 010-4z"/>
+        <circle cx="42" cy="36" r="3" fill="#ffffff"/>
+        <circle cx="26" cy="36" r="3" fill="#ffffff"/>
+        <text x="168" y="38" text-anchor="middle" fill="${color}" font-family="Arial,sans-serif" font-size="20" font-weight="900">PIDE AHORA!</text>
       </g>
-      <g transform="translate(${size - 290}, ${Math.round(footerH / 2 - 20)})">
+      <g transform="translate(${webX}, ${rowY})">
         <circle cx="20" cy="20" r="18" fill="#4A7FD6"/>
-        <circle cx="20" cy="20" r="11" fill="none" stroke="#fff" stroke-width="2"/>
-        <ellipse cx="20" cy="20" rx="11" ry="11" fill="none" stroke="#fff" stroke-width="1.5"/>
-        <line x1="20" y1="9" x2="20" y2="12" stroke="#fff" stroke-width="2"/>
-        <line x1="20" y1="28" x2="20" y2="31" stroke="#fff" stroke-width="2"/>
-        <line x1="9" y1="20" x2="12" y2="20" stroke="#fff" stroke-width="2"/>
-        <line x1="28" y1="20" x2="31" y2="20" stroke="#fff" stroke-width="2"/>
-        <text x="48" y="27" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="600">${web}</text>
+        <circle cx="20" cy="20" r="11" fill="none" stroke="#ffffff" stroke-width="2"/>
+        <line x1="20" y1="9" x2="20" y2="12" stroke="#ffffff" stroke-width="2"/>
+        <line x1="20" y1="28" x2="20" y2="31" stroke="#ffffff" stroke-width="2"/>
+        <line x1="9" y1="20" x2="12" y2="20" stroke="#ffffff" stroke-width="2"/>
+        <line x1="28" y1="20" x2="31" y2="20" stroke="#ffffff" stroke-width="2"/>
+        <text x="48" y="27" fill="#ffffff" font-family="Arial,sans-serif" font-size="18" font-weight="600">${web}</text>
       </g>
-    </svg>
-  `);
+    </svg>`;
 }
 
-function buildBottomFadeSvg(accent: string, width: number, height: number): Buffer {
-  return Buffer.from(`
+function buildBottomFadeSvg(accent: string, width: number, height: number): string {
+  const color = safeHexColor(accent);
+  return `
     <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="fade" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stop-color="${accent}" stop-opacity="0"/>
-          <stop offset="100%" stop-color="${accent}" stop-opacity="0.35"/>
+        <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="${color}" stop-opacity="0"/>
+          <stop offset="1" stop-color="${color}" stop-opacity="0.35"/>
         </linearGradient>
       </defs>
       <rect width="${width}" height="${height}" fill="url(#fade)"/>
-    </svg>
-  `);
+    </svg>`;
 }
 
-async function loadDefaultLogoSvg(): Promise<Buffer> {
+async function buildDefaultLogoPng(size: number): Promise<Buffer> {
+  const svg = `
+    <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 2}" fill="#ffffff"/>
+      <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 10}" fill="#c50000"/>
+      <text x="${size / 2}" y="${size / 2 - 4}" text-anchor="middle" fill="#f5a623"
+        font-family="Arial,sans-serif" font-size="${Math.round(size * 0.22)}" font-weight="bold">EP</text>
+      <text x="${size / 2}" y="${size / 2 + 28}" text-anchor="middle" fill="#ffffff"
+        font-family="Arial,sans-serif" font-size="${Math.round(size * 0.09)}" font-weight="600">El Pollon</text>
+    </svg>`;
+  return rasterizeSvg(svg, size, size);
+}
+
+async function loadLogoFromFile(): Promise<Buffer | null> {
   const paths = [
     join(__dirname, '../../../templates/social-posts/assets/logo-placeholder.svg'),
     join(process.cwd(), 'templates/social-posts/assets/logo-placeholder.svg'),
   ];
   for (const p of paths) {
     try {
-      return await readFile(p);
+      const raw = await readFile(p);
+      return sharp(raw).png().toBuffer();
     } catch {
       continue;
     }
   }
-  return Buffer.from(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
-      <circle cx="100" cy="100" r="96" fill="#fff" stroke="#c50000" stroke-width="8"/>
-      <circle cx="100" cy="100" r="82" fill="#c50000"/>
-      <text x="100" y="95" text-anchor="middle" fill="#f5a623" font-size="42" font-weight="bold" font-family="Arial">EP</text>
-      <text x="100" y="128" text-anchor="middle" fill="#fff" font-size="15" font-family="Arial">El Pollón</text>
-    </svg>
-  `);
+  return null;
 }
 
 async function prepareCircularLogo(logoUrl?: string): Promise<Buffer> {
   const { logoSize } = FRAME;
-  let source: Buffer;
+  let raster: Buffer | null = null;
 
   if (logoUrl?.startsWith('http')) {
     try {
@@ -212,37 +244,47 @@ async function prepareCircularLogo(logoUrl?: string): Promise<Buffer> {
         timeout: 15000,
         maxContentLength: 5 * 1024 * 1024,
       });
-      source = Buffer.from(data);
+      raster = await sharp(Buffer.from(data)).rotate().png().toBuffer();
     } catch {
-      source = await loadDefaultLogoSvg();
+      raster = null;
     }
-  } else {
-    source = await loadDefaultLogoSvg();
+  }
+
+  if (!raster) {
+    raster = await loadLogoFromFile();
+  }
+  if (!raster) {
+    raster = await buildDefaultLogoPng(logoSize);
   }
 
   const inner = logoSize - 14;
-  const photo = await sharp(source)
-    .resize(inner, inner, { fit: 'cover' })
-    .png()
-    .toBuffer();
+  let photo: Buffer;
+  try {
+    photo = await sharp(raster)
+      .resize(inner, inner, { fit: 'cover' })
+      .png()
+      .toBuffer();
+  } catch {
+    photo = await buildDefaultLogoPng(inner);
+  }
 
-  const circleMask = Buffer.from(`
-    <svg width="${inner}" height="${inner}">
-      <circle cx="${inner / 2}" cy="${inner / 2}" r="${inner / 2}" fill="#fff"/>
-    </svg>
-  `);
+  const maskSvg = `
+    <svg width="${inner}" height="${inner}" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="${inner / 2}" cy="${inner / 2}" r="${inner / 2}" fill="#ffffff"/>
+    </svg>`;
 
   const masked = await sharp(photo)
-    .composite([{ input: circleMask, blend: 'dest-in' }])
+    .composite([{ input: await rasterizeSvg(maskSvg, inner, inner), blend: 'dest-in' }])
     .png()
     .toBuffer();
 
-  const ring = Buffer.from(`
+  const ringSvg = `
     <svg width="${logoSize}" height="${logoSize}" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="${logoSize / 2}" cy="${logoSize / 2}" r="${logoSize / 2 - 3}" fill="#fff"/>
-      <circle cx="${logoSize / 2}" cy="${logoSize / 2}" r="${logoSize / 2 - 6}" fill="none" stroke="#fff" stroke-width="5"/>
-    </svg>
-  `);
+      <circle cx="${logoSize / 2}" cy="${logoSize / 2}" r="${logoSize / 2 - 3}" fill="#ffffff"/>
+      <circle cx="${logoSize / 2}" cy="${logoSize / 2}" r="${logoSize / 2 - 6}" fill="none" stroke="#ffffff" stroke-width="5"/>
+    </svg>`;
+
+  const ring = await rasterizeSvg(ringSvg, logoSize, logoSize);
 
   return sharp(ring)
     .composite([{ input: masked, top: 7, left: 7 }])
@@ -279,7 +321,6 @@ function computePhotoGrid(count: number, areaW: number, areaH: number, gap: numb
   return cells;
 }
 
-/** Plantilla El Pollón: esquina + logo + foto + footer inteligente */
 export async function composePollonGalleryFrame(input: FrameComposeInput): Promise<Buffer> {
   const { size, footerH } = FRAME;
   const contentH = size - footerH;
@@ -295,11 +336,16 @@ export async function composePollonGalleryFrame(input: FrameComposeInput): Promi
 
   for (let i = 0; i < photos.length; i++) {
     const cell = cells[i];
-    const tile = await sharp(photos[i])
-      .rotate()
-      .resize(cell.w, cell.h, { fit: 'cover', position: 'centre' })
-      .png()
-      .toBuffer();
+    let tile: Buffer;
+    try {
+      tile = await sharp(photos[i])
+        .rotate()
+        .resize(cell.w, cell.h, { fit: 'cover', position: 'centre' })
+        .png()
+        .toBuffer();
+    } catch {
+      throw new Error(`No se pudo procesar la foto ${i + 1}. Verifica que sea JPG o PNG valido.`);
+    }
     photoComposites.push({ input: tile, top: cell.y, left: cell.x });
   }
 
@@ -311,10 +357,12 @@ export async function composePollonGalleryFrame(input: FrameComposeInput): Promi
     .toBuffer();
 
   const fadeH = 48;
-  const logo = await prepareCircularLogo(input.logoUrl);
-  const footer = buildFooterSvg(accent);
-  const corner = buildCornerHeaderSvg(accent);
-  const fade = buildBottomFadeSvg(accent, size, fadeH);
+  const [logo, footer, corner, fade] = await Promise.all([
+    prepareCircularLogo(input.logoUrl),
+    rasterizeSvg(buildFooterSvg(accent), size, footerH),
+    rasterizeSvg(buildCornerHeaderSvg(accent), size, FRAME.cornerSize),
+    rasterizeSvg(buildBottomFadeSvg(accent, size, fadeH), size, fadeH),
+  ]);
 
   return sharp({
     create: { width: size, height: size, channels: 3, background: { r: 255, g: 255, b: 255 } },
