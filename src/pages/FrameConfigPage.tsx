@@ -10,8 +10,9 @@ import type { Branch, BrandFrameTemplate } from '@/types';
 import { Layers, Plus, Save, Trash2, Eye, Star, Copy } from 'lucide-react';
 
 const emptyTemplate = (): Partial<BrandFrameTemplate> => ({
-  name: 'Nueva plantilla',
-  description: '',
+  name: 'Header y Footer 01',
+  description: 'Diseño clásico con footer inteligente, tipografía grande y legible',
+  layout_version: 'hf01',
   is_default: false,
   header_style: 'corner',
   header_show_logo: true,
@@ -23,9 +24,17 @@ const emptyTemplate = (): Partial<BrandFrameTemplate> => ({
   footer_show_website: true,
   footer_show_cta: true,
   footer_show_footer_logo: true,
-  footer_height: 118,
+  footer_height: 132,
+  footer_adaptive_color: true,
+  footer_font_family: 'Roboto-Black',
+  footer_whatsapp_font_size: 28,
+  footer_website_font_size: 26,
+  footer_cta_font_size: 26,
+  footer_icon_size: 46,
   accent_color: '#c50000',
+  footer_bg_color: '#c50000',
   cta_bg_color: '#ffffff',
+  cta_text_color: '#c50000',
   whatsapp_icon_color: '#25D366',
   website_icon_color: '#4A7FD6',
   text_color: '#ffffff',
@@ -176,6 +185,9 @@ export default function FrameConfigPage() {
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold">{tpl.name}</h3>
                     {tpl.is_default && <Star className="w-4 h-4 text-amber-500 fill-amber-500" />}
+                    <span className="text-[10px] uppercase tracking-wide bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                      {(tpl.layout_version || 'hf01').toUpperCase()}
+                    </span>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">{tpl.description || 'Sin descripción'}</p>
                   <div className="text-xs text-gray-600 mt-2 space-y-0.5">
@@ -275,6 +287,77 @@ export default function FrameConfigPage() {
               </Card>
 
               <Card>
+                <CardHeader><CardTitle className="text-base">Tipografía del footer</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label>Tipo de letra</Label>
+                    <select
+                      className="w-full border rounded-md h-10 px-3"
+                      value={editing.footer_font_family || 'Roboto-Black'}
+                      onChange={(e) => setEditing({
+                        ...editing,
+                        footer_font_family: e.target.value as BrandFrameTemplate['footer_font_family'],
+                      })}
+                    >
+                      <option value="Roboto-Black">Roboto Black (más gruesa)</option>
+                      <option value="Roboto-Bold">Roboto Bold</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <Label>Tamaño WhatsApp</Label>
+                      <Input type="number" min={14} max={48} value={editing.footer_whatsapp_font_size ?? 28}
+                        onChange={(e) => setEditing({ ...editing, footer_whatsapp_font_size: Number(e.target.value) })} />
+                    </div>
+                    <div>
+                      <Label>Tamaño botón</Label>
+                      <Input type="number" min={14} max={48} value={editing.footer_cta_font_size ?? 26}
+                        onChange={(e) => setEditing({ ...editing, footer_cta_font_size: Number(e.target.value) })} />
+                    </div>
+                    <div>
+                      <Label>Tamaño web</Label>
+                      <Input type="number" min={14} max={48} value={editing.footer_website_font_size ?? 26}
+                        onChange={(e) => setEditing({ ...editing, footer_website_font_size: Number(e.target.value) })} />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Tamaño iconos (px)</Label>
+                    <Input type="number" min={32} max={72} value={editing.footer_icon_size ?? 46}
+                      onChange={(e) => setEditing({ ...editing, footer_icon_size: Number(e.target.value) })} />
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <Label>Color texto WhatsApp</Label>
+                      <Input type="color" value={editing.footer_whatsapp_text_color || editing.text_color || '#ffffff'}
+                        onChange={(e) => setEditing({ ...editing, footer_whatsapp_text_color: e.target.value })} />
+                    </div>
+                    <div>
+                      <Label>Color texto botón</Label>
+                      <Input type="color" value={editing.cta_text_color || '#c50000'}
+                        onChange={(e) => setEditing({ ...editing, cta_text_color: e.target.value })} />
+                    </div>
+                    <div>
+                      <Label>Color texto web</Label>
+                      <Input type="color" value={editing.footer_website_text_color || editing.text_color || '#ffffff'}
+                        onChange={(e) => setEditing({ ...editing, footer_website_text_color: e.target.value })} />
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={editing.footer_adaptive_color !== false}
+                      onChange={(e) => setEditing({ ...editing, footer_adaptive_color: e.target.checked })} />
+                    Footer inteligente: adaptar color al tono de la foto
+                  </label>
+                  {editing.footer_adaptive_color === false && (
+                    <div>
+                      <Label>Color footer fijo</Label>
+                      <Input type="color" value={editing.footer_bg_color || editing.accent_color || '#c50000'}
+                        onChange={(e) => setEditing({ ...editing, footer_bg_color: e.target.value })} />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
                 <CardHeader><CardTitle className="text-base">Header y colores</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
                   <div>
@@ -290,29 +373,24 @@ export default function FrameConfigPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label>Color acento</Label>
+                      <Label>Color acento header</Label>
                       <Input type="color" value={editing.accent_color || '#c50000'}
                         onChange={(e) => setEditing({ ...editing, accent_color: e.target.value })} />
                     </div>
                     <div>
-                      <Label>Color footer</Label>
-                      <Input type="color" value={editing.footer_bg_color || editing.accent_color || '#c50000'}
-                        onChange={(e) => setEditing({ ...editing, footer_bg_color: e.target.value })} />
+                      <Label>Texto general footer</Label>
+                      <Input type="color" value={editing.text_color || '#ffffff'}
+                        onChange={(e) => setEditing({ ...editing, text_color: e.target.value })} />
                     </div>
                     <div>
                       <Label>Botón fondo</Label>
                       <Input type="color" value={editing.cta_bg_color || '#ffffff'}
                         onChange={(e) => setEditing({ ...editing, cta_bg_color: e.target.value })} />
                     </div>
-                    <div>
-                      <Label>Texto footer</Label>
-                      <Input type="color" value={editing.text_color || '#ffffff'}
-                        onChange={(e) => setEditing({ ...editing, text_color: e.target.value })} />
-                    </div>
                   </div>
                   <div>
                     <Label>Altura footer (px)</Label>
-                    <Input type="number" min={80} max={200} value={editing.footer_height || 118}
+                    <Input type="number" min={100} max={200} value={editing.footer_height || 132}
                       onChange={(e) => setEditing({ ...editing, footer_height: Number(e.target.value) })} />
                   </div>
                   <label className="flex items-center gap-2 text-sm">

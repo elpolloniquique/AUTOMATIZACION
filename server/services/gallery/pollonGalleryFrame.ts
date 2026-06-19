@@ -4,7 +4,8 @@ import { fileURLToPath } from 'url';
 import sharp from 'sharp';
 import axios from 'axios';
 import { defaultFrameConfig, type FrameConfig } from './frameConfigService.js';
-import { fitTextToWidth, textToSvgPath } from './frameTextRenderer.js';
+import { fitTextToWidth, measureTextWidth, textToSvgPath } from './frameTextRenderer.js';
+import { getDeliveryIcon, getGlobeIcon, getWhatsappIcon } from './frameIconAssets.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -146,73 +147,107 @@ function buildCornerHeaderSvg(accent: string, cornerSize: number): string {
     </svg>`;
 }
 
-async function buildFooterSvg(
-  accent: string,
+async function buildFooterHf01(
+  smartAccent: string,
   cfg: FrameConfig,
   hasFooterLogo: boolean,
-): Promise<string> {
+): Promise<Buffer> {
   const { size } = FRAME;
   const footerH = cfg.footerHeight;
-  const color = safeHexColor(cfg.footerBgColor || accent);
-  const textColor = safeHexColor(cfg.textColor);
-  const ctaColor = safeHexColor(cfg.ctaTextColor || accent);
-  const waColor = safeHexColor(cfg.whatsappIconColor);
-  const webColor = safeHexColor(cfg.websiteIconColor);
-  const ctaBg = safeHexColor(cfg.ctaBgColor);
+  const bgColor = cfg.footerAdaptiveColor
+    ? safeHexColor(smartAccent)
+    : safeHexColor(cfg.footerBgColor || smartAccent);
+  const fontFamily = cfg.footerFontFamily;
+  const iconSize = cfg.footerIconSize;
+  const rowCenter = Math.round(footerH / 2);
+  const textBaseline = rowCenter + Math.round(iconSize * 0.18);
 
-  const btnY = Math.round(footerH / 2 - 30);
-  const btnX = Math.round(size / 2 - 152);
-  const rowY = Math.round(footerH / 2 - 20);
-  const rowX = hasFooterLogo && cfg.showFooterLogo ? 72 : 20;
-  const webX = size - 290;
+  const bgRgb = hexToRgb(bgColor);
+  const composites: sharp.OverlayOptions[] = [];
 
-  const parts: string[] = [
-    `<svg width="${size}" height="${footerH}" xmlns="http://www.w3.org/2000/svg">`,
-    `<rect width="${size}" height="${footerH}" fill="${color}"/>`,
-  ];
+  const leftPad = hasFooterLogo && cfg.showFooterLogo ? 68 : 20;
 
   if (cfg.showWhatsapp) {
-    const phoneFit = await fitTextToWidth(cfg.whatsappDisplay, 200, 22);
-    const phonePath = await textToSvgPath(phoneFit.text, { x: 50, y: 27, fontSize: phoneFit.fontSize });
-    parts.push(`
-      <g transform="translate(${rowX}, ${rowY})">
-        <circle cx="20" cy="20" r="20" fill="${waColor}"/>
-        <path fill="#ffffff" d="M20 10a10 10 0 00-10 10c0 1.8.5 3.5 1.4 5l-1.3 4.7 4.8-1.3a10 10 0 0014.1-9.4A10 10 0 0020 10z"/>
-        <path d="${phonePath}" fill="${textColor}"/>
-      </g>`);
+    const waIcon = await getWhatsappIcon(iconSize);
+    composites.push({
+      input: waIcon,
+      top: rowCenter - Math.round(iconSize / 2),
+      left: leftPad,
+    });
+
+    const waColor = safeHexColor(cfg.whatsappTextColor || cfg.textColor);
+    const phoneFit = await fitTextToWidth(cfg.whatsappDisplay, 250, cfg.whatsappFontSize, fontFamily);
+    const phonePath = await textToSvgPath(phoneFit.text, {
+      x: leftPad + iconSize + 14,
+      y: textBaseline,
+      fontSize: phoneFit.fontSize,
+      fontFamily,
+    });
+    const waTextSvg = `<svg width="${size}" height="${footerH}" xmlns="http://www.w3.org/2000/svg"><path d="${phonePath}" fill="${waColor}"/></svg>`;
+    composites.push({ input: await rasterizeSvg(waTextSvg, size, footerH), top: 0, left: 0 });
   }
 
   if (cfg.showCta) {
-    const ctaFit = await fitTextToWidth(cfg.ctaText, 200, 20);
-    const ctaPath = await textToSvgPath(ctaFit.text, { x: 168, y: 38, fontSize: ctaFit.fontSize, anchor: 'middle' });
-    parts.push(`
-      <g transform="translate(${btnX}, ${btnY})">
-        <rect width="304" height="60" rx="30" fill="${ctaBg}"/>
-        <circle cx="34" cy="30" r="16" fill="${ctaColor}"/>
-        <path fill="#ffffff" d="M28 36h2l1-3h4l1 3h2l-3-9h-4l-3 9zm4-11a2 2 0 110 4 2 2 0 010-4z"/>
-        <circle cx="42" cy="36" r="3" fill="#ffffff"/>
-        <circle cx="26" cy="36" r="3" fill="#ffffff"/>
-        <path d="${ctaPath}" fill="${ctaColor}"/>
-      </g>`);
+    const pillW = 340;
+    const pillH = 68;
+    const pillX = Math.round(size / 2 - pillW / 2);
+    const pillY = rowCenter - Math.round(pillH / 2);
+    const ctaColor = safeHexColor(cfg.ctaTextColor || smartAccent);
+    const ctaBg = safeHexColor(cfg.ctaBgColor);
+
+    const deliveryIcon = await getDeliveryIcon(Math.round(iconSize * 0.82));
+    composites.push({
+      input: deliveryIcon,
+      top: pillY + Math.round((pillH - iconSize * 0.82) / 2),
+      left: pillX + 16,
+    });
+
+    const ctaFit = await fitTextToWidth(cfg.ctaText, pillW - 90, cfg.ctaFontSize, fontFamily);
+    const ctaPath = await textToSvgPath(ctaFit.text, {
+      x: pillX + pillW / 2 + 12,
+      y: pillY + Math.round(pillH * 0.72),
+      fontSize: ctaFit.fontSize,
+      anchor: 'middle',
+      fontFamily,
+    });
+
+    const ctaSvg = `<svg width="${size}" height="${footerH}" xmlns="http://www.w3.org/2000/svg">
+      <rect x="${pillX}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillH / 2}" fill="${ctaBg}"/>
+      <path d="${ctaPath}" fill="${ctaColor}"/>
+    </svg>`;
+    composites.push({ input: await rasterizeSvg(ctaSvg, size, footerH), top: 0, left: 0 });
   }
 
   if (cfg.showWebsite) {
-    const webFit = await fitTextToWidth(cfg.websiteDisplay, 180, 18);
-    const webPath = await textToSvgPath(webFit.text, { x: 48, y: 27, fontSize: webFit.fontSize });
-    parts.push(`
-      <g transform="translate(${webX}, ${rowY})">
-        <circle cx="20" cy="20" r="18" fill="${webColor}"/>
-        <circle cx="20" cy="20" r="11" fill="none" stroke="#ffffff" stroke-width="2"/>
-        <line x1="20" y1="9" x2="20" y2="12" stroke="#ffffff" stroke-width="2"/>
-        <line x1="20" y1="28" x2="20" y2="31" stroke="#ffffff" stroke-width="2"/>
-        <line x1="9" y1="20" x2="12" y2="20" stroke="#ffffff" stroke-width="2"/>
-        <line x1="28" y1="20" x2="31" y2="20" stroke="#ffffff" stroke-width="2"/>
-        <path d="${webPath}" fill="${textColor}"/>
-      </g>`);
+    const webColor = safeHexColor(cfg.websiteTextColor || cfg.textColor);
+    const webFit = await fitTextToWidth(cfg.websiteDisplay, 220, cfg.websiteFontSize, fontFamily);
+    const textW = await measureTextWidth(webFit.text, webFit.fontSize, fontFamily);
+    const webIcon = await getGlobeIcon(iconSize);
+    const blockW = iconSize + 14 + textW;
+    const blockX = size - blockW - 20;
+
+    composites.push({
+      input: webIcon,
+      top: rowCenter - Math.round(iconSize / 2),
+      left: blockX,
+    });
+
+    const webPath = await textToSvgPath(webFit.text, {
+      x: blockX + iconSize + 14,
+      y: textBaseline,
+      fontSize: webFit.fontSize,
+      fontFamily,
+    });
+    const webTextSvg = `<svg width="${size}" height="${footerH}" xmlns="http://www.w3.org/2000/svg"><path d="${webPath}" fill="${webColor}"/></svg>`;
+    composites.push({ input: await rasterizeSvg(webTextSvg, size, footerH), top: 0, left: 0 });
   }
 
-  parts.push('</svg>');
-  return parts.join('\n');
+  return sharp({
+    create: { width: size, height: footerH, channels: 3, background: bgRgb },
+  })
+    .composite(composites)
+    .png()
+    .toBuffer();
 }
 
 function buildBottomFadeSvg(accent: string, width: number, height: number): string {
@@ -397,11 +432,10 @@ export async function composePollonGalleryFrame(input: FrameComposeInput): Promi
     showFooterLogo ? prepareFooterLogo(input.logoUrl) : Promise.resolve(null),
   ]);
 
-  const footerSvg = await buildFooterSvg(accent, cfg, Boolean(footerLogo));
+  const footer = await buildFooterHf01(accent, cfg, Boolean(footerLogo));
   const cornerSize = cfg.headerStyle === 'minimal' ? 0 : cfg.cornerSize;
 
-  const [footer, corner, fade] = await Promise.all([
-    rasterizeSvg(footerSvg, size, footerH),
+  const [corner, fade] = await Promise.all([
     cornerSize > 0
       ? rasterizeSvg(buildCornerHeaderSvg(accent, cornerSize), size, cornerSize)
       : Promise.resolve(null),
@@ -435,29 +469,34 @@ export async function composePollonGalleryFrame(input: FrameComposeInput): Promi
 
 /** Preview del header/footer para la UI de configuracion */
 export async function composeFramePreview(cfg: FrameConfig, brandColor?: string, logoUrl?: string): Promise<Buffer> {
-  const accent = safeHexColor(cfg.accentColor || brandColor || FRAME.defaultAccent);
-  const footerH = cfg.footerHeight;
   const size = FRAME.size;
+  const footerH = cfg.footerHeight;
   const previewH = 400;
   const contentH = previewH - footerH;
 
-  const placeholder = await sharp({
-    create: { width: size, height: contentH, channels: 3, background: { r: 50, g: 50, b: 50 } },
-  }).png().toBuffer();
+  const warmPlaceholder = await sharp({
+    create: { width: size, height: contentH, channels: 3, background: { r: 180, g: 120, b: 70 } },
+  })
+    .png()
+    .toBuffer();
+
+  const smartAccent = await extractSmartAccentColor(
+    [warmPlaceholder],
+    cfg.accentColor || brandColor || FRAME.defaultAccent,
+  );
 
   const footerLogo = cfg.showFooterLogo ? await prepareFooterLogo(logoUrl) : null;
-  const footerSvg = await buildFooterSvg(accent, cfg, Boolean(footerLogo));
+  const footer = await buildFooterHf01(smartAccent, cfg, Boolean(footerLogo));
   const cornerSize = cfg.headerStyle === 'minimal' ? 0 : Math.min(cfg.cornerSize, 200);
 
-  const [footer, corner] = await Promise.all([
-    rasterizeSvg(footerSvg, size, footerH),
+  const [corner] = await Promise.all([
     cornerSize > 0
-      ? rasterizeSvg(buildCornerHeaderSvg(accent, cornerSize), size, cornerSize)
+      ? rasterizeSvg(buildCornerHeaderSvg(smartAccent, cornerSize), size, cornerSize)
       : Promise.resolve(null),
   ]);
 
   const composites: sharp.OverlayOptions[] = [
-    { input: placeholder, top: 0, left: 0 },
+    { input: warmPlaceholder, top: 0, left: 0 },
     { input: footer, top: contentH, left: 0 },
   ];
   if (corner) composites.push({ input: corner, top: 0, left: 0 });

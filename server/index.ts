@@ -20,6 +20,7 @@ import { getSupabaseAdmin } from './utils/supabase.js';
 import { saveAndSchedulePost, canAutoApprove, isPublishDue } from './services/posts/postScheduleService.js';
 import {
   buildTemplatePayload,
+  bodyToTemplateRow,
   resolveFrameConfig,
   templateRowToConfig,
 } from './services/gallery/frameConfigService.js';
@@ -257,6 +258,15 @@ const frameTemplateSchema = z.object({
   footer_show_cta: z.boolean().optional(),
   footer_show_footer_logo: z.boolean().optional(),
   footer_height: z.number().int().min(80).max(200).optional(),
+  layout_version: z.string().optional(),
+  footer_adaptive_color: z.boolean().optional(),
+  footer_font_family: z.enum(['Roboto-Bold', 'Roboto-Black']).optional(),
+  footer_whatsapp_font_size: z.number().int().min(14).max(48).optional(),
+  footer_website_font_size: z.number().int().min(14).max(48).optional(),
+  footer_cta_font_size: z.number().int().min(14).max(48).optional(),
+  footer_whatsapp_text_color: z.string().optional().nullable(),
+  footer_website_text_color: z.string().optional().nullable(),
+  footer_icon_size: z.number().int().min(32).max(72).optional(),
   accent_color: z.string().optional().nullable(),
   footer_bg_color: z.string().optional().nullable(),
   cta_bg_color: z.string().optional().nullable(),
@@ -305,36 +315,7 @@ app.post('/api/frame-templates/preview', authMiddleware, asyncHandler(async (req
     brandColor = branch?.brand_color || undefined;
   }
 
-  const cfg = templateRowToConfig({
-    id: 'preview',
-    branch_id: branchId || null,
-    name: parsed.data.name,
-    description: parsed.data.description || null,
-    is_default: parsed.data.is_default ?? false,
-    is_active: true,
-    header_style: parsed.data.header_style || 'corner',
-    header_show_logo: parsed.data.header_show_logo ?? true,
-    header_corner_size: parsed.data.header_corner_size ?? 300,
-    footer_whatsapp: parsed.data.footer_whatsapp || null,
-    footer_whatsapp_display: parsed.data.footer_whatsapp_display || null,
-    footer_website: parsed.data.footer_website || null,
-    footer_website_display: parsed.data.footer_website_display || null,
-    footer_cta_text: parsed.data.footer_cta_text || 'PIDE AHORA!',
-    footer_show_whatsapp: parsed.data.footer_show_whatsapp ?? true,
-    footer_show_website: parsed.data.footer_show_website ?? true,
-    footer_show_cta: parsed.data.footer_show_cta ?? true,
-    footer_show_footer_logo: parsed.data.footer_show_footer_logo ?? true,
-    footer_height: parsed.data.footer_height ?? 118,
-    accent_color: parsed.data.accent_color || null,
-    footer_bg_color: parsed.data.footer_bg_color || null,
-    cta_bg_color: parsed.data.cta_bg_color || '#ffffff',
-    cta_text_color: parsed.data.cta_text_color || null,
-    whatsapp_icon_color: parsed.data.whatsapp_icon_color || '#25D366',
-    website_icon_color: parsed.data.website_icon_color || '#4A7FD6',
-    text_color: parsed.data.text_color || '#ffffff',
-    created_at: '',
-    updated_at: '',
-  }, null);
+  const cfg = templateRowToConfig(bodyToTemplateRow(parsed.data, branchId || null), null);
   const buffer = await composeFramePreview(cfg, brandColor, logoUrl);
   res.json({ preview: `data:image/png;base64,${buffer.toString('base64')}` });
 }));

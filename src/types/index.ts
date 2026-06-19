@@ -54,6 +54,7 @@ export interface BrandFrameTemplate {
   description: string | null;
   is_default: boolean;
   is_active: boolean;
+  layout_version?: string;
   header_style: 'corner' | 'bar' | 'minimal';
   header_show_logo: boolean;
   header_corner_size: number;
@@ -67,6 +68,14 @@ export interface BrandFrameTemplate {
   footer_show_cta: boolean;
   footer_show_footer_logo: boolean;
   footer_height: number;
+  footer_adaptive_color?: boolean;
+  footer_font_family?: 'Roboto-Bold' | 'Roboto-Black';
+  footer_whatsapp_font_size?: number;
+  footer_website_font_size?: number;
+  footer_cta_font_size?: number;
+  footer_whatsapp_text_color?: string | null;
+  footer_website_text_color?: string | null;
+  footer_icon_size?: number;
   accent_color: string | null;
   footer_bg_color: string | null;
   cta_bg_color: string | null;
