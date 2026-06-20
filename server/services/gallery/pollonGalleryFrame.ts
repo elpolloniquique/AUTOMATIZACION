@@ -350,11 +350,16 @@ async function prepareLogoBadge(raster: Buffer, badgeSize: number): Promise<Buff
     .toBuffer();
 }
 
-async function prepareCircularLogo(logoUrl?: string): Promise<Buffer> {
+async function prepareCircularLogo(logoUrl?: string, badgeSize: number = FRAME.logoSize as number): Promise<Buffer> {
   let raster = await loadLogoRaster(logoUrl);
   if (!raster) raster = await loadLogoFromFile();
-  if (!raster) raster = await buildDefaultLogoPng(FRAME.logoSize);
-  return prepareLogoBadge(raster, FRAME.logoSize);
+  if (!raster) raster = await buildDefaultLogoPng(badgeSize);
+  return prepareLogoBadge(raster, badgeSize);
+}
+
+/** Logo circular para HF02 y otros layouts */
+export async function prepareCircularHeaderLogo(logoUrl?: string, badgeSize = 168): Promise<Buffer> {
+  return prepareCircularLogo(logoUrl, badgeSize);
 }
 
 async function prepareFooterLogo(logoUrl?: string): Promise<Buffer | null> {

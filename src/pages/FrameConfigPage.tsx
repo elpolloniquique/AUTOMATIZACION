@@ -42,7 +42,7 @@ const emptyTemplateHf01 = (): Partial<BrandFrameTemplate> => ({
 
 const emptyTemplateHf02 = (): Partial<BrandFrameTemplate> => ({
   name: 'Header y Footer 02',
-  description: 'Logo centrado arriba, barra naranja inferior y botón ORDENA AHORA',
+  description: 'Esquinas amarillas, logo circular, rayo, footer amarillo con web, dirección y teléfono',
   layout_version: 'hf02',
   is_default: false,
   header_style: 'minimal',
@@ -50,27 +50,31 @@ const emptyTemplateHf02 = (): Partial<BrandFrameTemplate> => ({
   header_corner_size: 300,
   footer_whatsapp_display: '+56 9 8692 5310',
   footer_website_display: 'www.el-pollon.cl',
+  footer_address_display: 'Vivar 1086, Iquique',
   footer_cta_text: 'ORDENA AHORA!',
   footer_show_whatsapp: true,
   footer_show_website: true,
+  footer_show_address: true,
   footer_show_cta: true,
   footer_show_footer_logo: false,
-  footer_height: 130,
+  footer_height: 145,
   footer_adaptive_color: true,
   footer_font_family: 'Roboto-Black',
-  footer_whatsapp_font_size: 26,
-  footer_website_font_size: 26,
-  footer_cta_font_size: 24,
-  footer_icon_size: 44,
-  accent_color: '#c50000',
-  footer_bg_color: '#F59E0B',
-  cta_bg_color: '#c50000',
+  footer_whatsapp_font_size: 22,
+  footer_website_font_size: 22,
+  footer_address_font_size: 22,
+  footer_cta_font_size: 26,
+  footer_icon_size: 42,
+  accent_color: '#F2B705',
+  footer_bg_color: '#F2B705',
+  cta_bg_color: '#C40000',
   cta_text_color: '#ffffff',
-  whatsapp_icon_color: '#c50000',
-  website_icon_color: '#c50000',
+  whatsapp_icon_color: '#C40000',
+  website_icon_color: '#C40000',
   text_color: '#000000',
   footer_whatsapp_text_color: '#000000',
   footer_website_text_color: '#000000',
+  footer_address_text_color: '#000000',
 });
 
 const LAYOUT_PRESETS: Record<string, () => Partial<BrandFrameTemplate>> = {
@@ -234,6 +238,7 @@ export default function FrameConfigPage() {
                   <div className="text-xs text-gray-600 mt-2 space-y-0.5">
                     <p>WhatsApp: {tpl.footer_whatsapp_display || '—'}</p>
                     <p>Web: {tpl.footer_website_display || '—'}</p>
+                    {tpl.layout_version === 'hf02' && <p>Dirección: {tpl.footer_address_display || '—'}</p>}
                     <p>Botón: {tpl.footer_cta_text}</p>
                   </div>
                 </div>
@@ -302,7 +307,7 @@ export default function FrameConfigPage() {
                     </select>
                     {(editing.layout_version || 'hf01') === 'hf02' && (
                       <p className="text-xs text-gray-500 mt-1">
-                        Logo centrado arriba, footer naranja inteligente, iconos web/teléfono en círculo rojo.
+                        Esquinas amarillas, logo circular centrado, rayo decorativo y footer con web, dirección y teléfono.
                       </p>
                     )}
                   </div>
@@ -332,6 +337,16 @@ export default function FrameConfigPage() {
                       placeholder="www.el-pollon.cl"
                     />
                   </div>
+                  {(editing.layout_version || 'hf01') === 'hf02' && (
+                    <div>
+                      <Label>Dirección (visible en footer)</Label>
+                      <Input
+                        value={editing.footer_address_display || ''}
+                        onChange={(e) => setEditing({ ...editing, footer_address_display: e.target.value })}
+                        placeholder="Vivar 1086, Iquique"
+                      />
+                    </div>
+                  )}
                   <div>
                     <Label>Texto del botón central</Label>
                     <Input
@@ -340,11 +355,11 @@ export default function FrameConfigPage() {
                       placeholder="PIDE AHORA!"
                     />
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-sm">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                     <label className="flex items-center gap-1">
                       <input type="checkbox" checked={editing.footer_show_whatsapp !== false}
                         onChange={(e) => setEditing({ ...editing, footer_show_whatsapp: e.target.checked })} />
-                      WhatsApp
+                      Teléfono
                     </label>
                     <label className="flex items-center gap-1">
                       <input type="checkbox" checked={editing.footer_show_cta !== false}
@@ -356,6 +371,13 @@ export default function FrameConfigPage() {
                         onChange={(e) => setEditing({ ...editing, footer_show_website: e.target.checked })} />
                       Web
                     </label>
+                    {(editing.layout_version || 'hf01') === 'hf02' && (
+                      <label className="flex items-center gap-1">
+                        <input type="checkbox" checked={editing.footer_show_address !== false}
+                          onChange={(e) => setEditing({ ...editing, footer_show_address: e.target.checked })} />
+                        Dirección
+                      </label>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -377,9 +399,9 @@ export default function FrameConfigPage() {
                       <option value="Roboto-Bold">Roboto Bold</option>
                     </select>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className={`grid gap-3 ${(editing.layout_version || 'hf01') === 'hf02' ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
                     <div>
-                      <Label>Tamaño WhatsApp</Label>
+                      <Label>Tamaño teléfono</Label>
                       <Input type="number" min={14} max={48} value={editing.footer_whatsapp_font_size ?? 28}
                         onChange={(e) => setEditing({ ...editing, footer_whatsapp_font_size: Number(e.target.value) })} />
                     </div>
@@ -393,6 +415,13 @@ export default function FrameConfigPage() {
                       <Input type="number" min={14} max={48} value={editing.footer_website_font_size ?? 26}
                         onChange={(e) => setEditing({ ...editing, footer_website_font_size: Number(e.target.value) })} />
                     </div>
+                    {(editing.layout_version || 'hf01') === 'hf02' && (
+                      <div>
+                        <Label>Tamaño dirección</Label>
+                        <Input type="number" min={14} max={48} value={editing.footer_address_font_size ?? 22}
+                          onChange={(e) => setEditing({ ...editing, footer_address_font_size: Number(e.target.value) })} />
+                      </div>
+                    )}
                   </div>
                   <div>
                     <Label>Tamaño iconos (px)</Label>
@@ -448,8 +477,8 @@ export default function FrameConfigPage() {
                     </div>
                   )}
                   {(editing.layout_version || 'hf01') === 'hf02' && (
-                    <p className="text-sm text-gray-600 bg-orange-50 border border-orange-100 rounded-md p-3">
-                      HF02 usa logo centrado en franja blanca superior (200px). No aplica esquina diagonal.
+                    <p className="text-sm text-gray-600 bg-yellow-50 border border-yellow-100 rounded-md p-3">
+                      HF02: esquinas amarillas, logo circular centrado con rayo, footer amarillo con 3 datos de contacto.
                     </p>
                   )}
                   <div className="grid grid-cols-2 gap-3">

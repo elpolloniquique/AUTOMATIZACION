@@ -6,9 +6,11 @@ export interface FrameConfig {
   layoutVersion: string;
   whatsappDisplay: string;
   websiteDisplay: string;
+  addressDisplay: string;
   ctaText: string;
   showWhatsapp: boolean;
   showWebsite: boolean;
+  showAddress: boolean;
   showCta: boolean;
   showFooterLogo: boolean;
   showHeaderLogo: boolean;
@@ -25,9 +27,11 @@ export interface FrameConfig {
   textColor: string;
   whatsappTextColor?: string;
   websiteTextColor?: string;
+  addressTextColor?: string;
   footerFontFamily: FooterFontFamily;
   whatsappFontSize: number;
   websiteFontSize: number;
+  addressFontSize: number;
   ctaFontSize: number;
   footerIconSize: number;
 }
@@ -47,6 +51,9 @@ export interface FrameTemplateRow {
   footer_whatsapp_display: string | null;
   footer_website: string | null;
   footer_website_display: string | null;
+  footer_address: string | null;
+  footer_address_display: string | null;
+  footer_show_address?: boolean | null;
   footer_cta_text: string;
   footer_show_whatsapp: boolean;
   footer_show_website: boolean;
@@ -60,6 +67,8 @@ export interface FrameTemplateRow {
   footer_cta_font_size?: number | null;
   footer_whatsapp_text_color?: string | null;
   footer_website_text_color?: string | null;
+  footer_address_font_size?: number | null;
+  footer_address_text_color?: string | null;
   footer_icon_size?: number | null;
   accent_color: string | null;
   footer_bg_color: string | null;
@@ -93,6 +102,11 @@ function formatWebsiteDisplay(raw: string | null | undefined): string {
     .slice(0, 28);
 }
 
+function formatAddressDisplay(raw: string | null | undefined): string {
+  if (!raw) return POLLON_BRAND.addressDisplay;
+  return raw.replace(/[^\x20-\x7EáéíóúÁÉÍÓÚñÑ,.-]/g, '').slice(0, 32);
+}
+
 function parseFontFamily(raw: string | null | undefined): FooterFontFamily {
   if (raw === 'Roboto-Bold') return 'Roboto-Bold';
   return 'Roboto-Black';
@@ -104,29 +118,34 @@ export function defaultFrameConfig(layout: string = 'hf01'): FrameConfig {
       layoutVersion: 'hf02',
       whatsappDisplay: POLLON_BRAND.whatsappPhone,
       websiteDisplay: POLLON_BRAND.websiteDisplay,
+      addressDisplay: POLLON_BRAND.addressDisplay,
       ctaText: 'ORDENA AHORA!',
       showWhatsapp: true,
       showWebsite: true,
+      showAddress: true,
       showCta: true,
       showFooterLogo: false,
       showHeaderLogo: true,
-      footerHeight: 130,
+      footerHeight: 145,
       headerStyle: 'minimal',
       cornerSize: 300,
       footerAdaptiveColor: true,
-      ctaBgColor: '#c50000',
+      accentColor: '#F2B705',
+      ctaBgColor: '#C40000',
       ctaTextColor: '#ffffff',
-      whatsappIconColor: '#c50000',
-      websiteIconColor: '#c50000',
+      whatsappIconColor: '#C40000',
+      websiteIconColor: '#C40000',
       textColor: '#000000',
       whatsappTextColor: '#000000',
       websiteTextColor: '#000000',
-      footerBgColor: '#F59E0B',
+      addressTextColor: '#000000',
+      footerBgColor: '#F2B705',
       footerFontFamily: 'Roboto-Black',
-      whatsappFontSize: 26,
-      websiteFontSize: 26,
-      ctaFontSize: 24,
-      footerIconSize: 44,
+      whatsappFontSize: 22,
+      websiteFontSize: 22,
+      addressFontSize: 22,
+      ctaFontSize: 26,
+      footerIconSize: 42,
     };
   }
 
@@ -134,9 +153,11 @@ export function defaultFrameConfig(layout: string = 'hf01'): FrameConfig {
     layoutVersion: 'hf01',
     whatsappDisplay: POLLON_BRAND.whatsappPhone,
     websiteDisplay: POLLON_BRAND.websiteDisplay,
+    addressDisplay: POLLON_BRAND.addressDisplay,
     ctaText: 'PIDE AHORA!',
     showWhatsapp: true,
     showWebsite: true,
+    showAddress: false,
     showCta: true,
     showFooterLogo: true,
     showHeaderLogo: true,
@@ -152,6 +173,7 @@ export function defaultFrameConfig(layout: string = 'hf01'): FrameConfig {
     footerFontFamily: 'Roboto-Black',
     whatsappFontSize: 28,
     websiteFontSize: 26,
+    addressFontSize: 22,
     ctaFontSize: 26,
     footerIconSize: 46,
   };
@@ -159,7 +181,7 @@ export function defaultFrameConfig(layout: string = 'hf01'): FrameConfig {
 
 export function templateRowToConfig(
   template: FrameTemplateRow | null,
-  branch?: { whatsapp?: string | null; website?: string | null; brand_color?: string | null } | null,
+  branch?: { whatsapp?: string | null; website?: string | null; address?: string | null; brand_color?: string | null } | null,
 ): FrameConfig {
   const layout = template?.layout_version || 'hf01';
   const base = defaultFrameConfig(layout);
@@ -170,14 +192,19 @@ export function templateRowToConfig(
   const websiteRaw = template?.footer_website_display
     || template?.footer_website
     || branch?.website;
+  const addressRaw = template?.footer_address_display
+    || template?.footer_address
+    || branch?.address;
 
   return {
     layoutVersion: template?.layout_version || base.layoutVersion,
     whatsappDisplay: formatWhatsappDisplay(whatsappRaw),
     websiteDisplay: formatWebsiteDisplay(websiteRaw),
+    addressDisplay: formatAddressDisplay(addressRaw),
     ctaText: (template?.footer_cta_text || base.ctaText).replace(/[^\x20-\x7E¡!]/g, '').slice(0, 24) || 'PIDE AHORA!',
     showWhatsapp: template?.footer_show_whatsapp ?? base.showWhatsapp,
     showWebsite: template?.footer_show_website ?? base.showWebsite,
+    showAddress: template?.footer_show_address ?? base.showAddress,
     showCta: template?.footer_show_cta ?? base.showCta,
     showFooterLogo: template?.footer_show_footer_logo ?? base.showFooterLogo,
     showHeaderLogo: template?.header_show_logo ?? base.showHeaderLogo,
@@ -194,9 +221,11 @@ export function templateRowToConfig(
     textColor: template?.text_color || base.textColor,
     whatsappTextColor: template?.footer_whatsapp_text_color || undefined,
     websiteTextColor: template?.footer_website_text_color || undefined,
+    addressTextColor: template?.footer_address_text_color || undefined,
     footerFontFamily: parseFontFamily(template?.footer_font_family),
     whatsappFontSize: template?.footer_whatsapp_font_size ?? base.whatsappFontSize,
     websiteFontSize: template?.footer_website_font_size ?? base.websiteFontSize,
+    addressFontSize: template?.footer_address_font_size ?? base.addressFontSize,
     ctaFontSize: template?.footer_cta_font_size ?? base.ctaFontSize,
     footerIconSize: template?.footer_icon_size ?? base.footerIconSize,
   };
@@ -211,7 +240,7 @@ export async function resolveFrameConfig(
   const supabase = getSupabaseAdmin();
   const { data: branch, error: branchError } = await supabase
     .from('branches')
-    .select('whatsapp, website, brand_color, frame_template_id')
+    .select('whatsapp, website, address, brand_color, frame_template_id')
     .eq('id', branchId)
     .maybeSingle();
 
@@ -279,12 +308,15 @@ export function buildTemplatePayload(body: Record<string, unknown>) {
     footer_whatsapp_display: body.footer_whatsapp_display || null,
     footer_website: body.footer_website || null,
     footer_website_display: body.footer_website_display || null,
+    footer_address: body.footer_address || null,
+    footer_address_display: body.footer_address_display || null,
+    footer_show_address: body.layout_version === 'hf02' ? body.footer_show_address !== false : Boolean(body.footer_show_address),
     footer_cta_text: body.footer_cta_text || 'PIDE AHORA!',
     footer_show_whatsapp: body.footer_show_whatsapp !== false,
     footer_show_website: body.footer_show_website !== false,
     footer_show_cta: body.footer_show_cta !== false,
     footer_show_footer_logo: body.footer_show_footer_logo !== false,
-    footer_height: Number(body.footer_height) || (body.layout_version === 'hf02' ? 130 : 132),
+    footer_height: Number(body.footer_height) || (body.layout_version === 'hf02' ? 145 : 132),
     footer_adaptive_color: body.footer_adaptive_color !== false,
     footer_font_family: body.footer_font_family || 'Roboto-Black',
     footer_whatsapp_font_size: Number(body.footer_whatsapp_font_size) || 28,
@@ -292,6 +324,8 @@ export function buildTemplatePayload(body: Record<string, unknown>) {
     footer_cta_font_size: Number(body.footer_cta_font_size) || 26,
     footer_whatsapp_text_color: body.footer_whatsapp_text_color || null,
     footer_website_text_color: body.footer_website_text_color || null,
+    footer_address_font_size: Number(body.footer_address_font_size) || null,
+    footer_address_text_color: body.footer_address_text_color || null,
     footer_icon_size: Number(body.footer_icon_size) || 46,
     accent_color: body.accent_color || null,
     footer_bg_color: body.footer_bg_color || null,
@@ -321,6 +355,9 @@ export function bodyToTemplateRow(data: Record<string, unknown>, branchId?: stri
     footer_whatsapp_display: (data.footer_whatsapp_display as string) || null,
     footer_website: (data.footer_website as string) || null,
     footer_website_display: (data.footer_website_display as string) || null,
+    footer_address: (data.footer_address as string) || null,
+    footer_address_display: (data.footer_address_display as string) || null,
+    footer_show_address: (data.layout_version as string) === 'hf02' ? data.footer_show_address !== false : Boolean(data.footer_show_address),
     footer_cta_text: (data.footer_cta_text as string) || 'PIDE AHORA!',
     footer_show_whatsapp: data.footer_show_whatsapp !== false,
     footer_show_website: data.footer_show_website !== false,
@@ -334,6 +371,8 @@ export function bodyToTemplateRow(data: Record<string, unknown>, branchId?: stri
     footer_cta_font_size: Number(data.footer_cta_font_size) || 26,
     footer_whatsapp_text_color: (data.footer_whatsapp_text_color as string) || null,
     footer_website_text_color: (data.footer_website_text_color as string) || null,
+    footer_address_font_size: data.footer_address_font_size != null ? Number(data.footer_address_font_size) : null,
+    footer_address_text_color: (data.footer_address_text_color as string) || null,
     footer_icon_size: Number(data.footer_icon_size) || 46,
     accent_color: (data.accent_color as string) || null,
     footer_bg_color: (data.footer_bg_color as string) || null,

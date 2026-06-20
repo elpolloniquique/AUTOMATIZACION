@@ -3,6 +3,7 @@ export const POLLON_BRAND = {
   whatsappPhone: '+56 9 8692 5310',
   websiteUrl: 'https://www.el-pollon.cl/',
   websiteDisplay: 'www.el-pollon.cl',
+  addressDisplay: 'Vivar 1086, Iquique',
   deliveryCities: 'Iquique, Alto Hospicio y Arica',
   hours: '11:30 a 23:00 hrs',
   tagline: 'Pollo a la Brasa · Delivery a Domicilio',

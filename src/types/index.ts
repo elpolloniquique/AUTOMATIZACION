@@ -62,6 +62,9 @@ export interface BrandFrameTemplate {
   footer_whatsapp_display: string | null;
   footer_website: string | null;
   footer_website_display: string | null;
+  footer_address?: string | null;
+  footer_address_display?: string | null;
+  footer_show_address?: boolean;
   footer_cta_text: string;
   footer_show_whatsapp: boolean;
   footer_show_website: boolean;
@@ -72,9 +75,11 @@ export interface BrandFrameTemplate {
   footer_font_family?: 'Roboto-Bold' | 'Roboto-Black';
   footer_whatsapp_font_size?: number;
   footer_website_font_size?: number;
+  footer_address_font_size?: number;
   footer_cta_font_size?: number;
   footer_whatsapp_text_color?: string | null;
   footer_website_text_color?: string | null;
+  footer_address_text_color?: string | null;
   footer_icon_size?: number;
   accent_color: string | null;
   footer_bg_color: string | null;

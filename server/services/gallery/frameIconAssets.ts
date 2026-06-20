@@ -99,23 +99,80 @@ export async function getSpeedBoltIcon(size: number): Promise<Buffer> {
   return rasterizeIcon('bolt', svg, size);
 }
 
-/** Globo blanco sobre circulo rojo — estilo HF02 */
-export async function getGlobeOnRedCircle(size: number, red = '#c50000'): Promise<Buffer> {
+/** Globo blanco sobre circulo rojo realista — estilo HF02 */
+export async function getGlobeOnRedCircle(size: number, red = '#C40000'): Promise<Buffer> {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
-    <circle cx="48" cy="48" r="44" fill="${red}"/>
-    <ellipse cx="48" cy="48" rx="26" ry="10" fill="none" stroke="#fff" stroke-width="2.2"/>
-    <ellipse cx="48" cy="48" rx="10" ry="26" fill="none" stroke="#fff" stroke-width="2.2"/>
-    <path d="M22 48h52M48 22v52" stroke="#fff" stroke-width="1.8" opacity="0.85"/>
-    <path fill="#fff" opacity="0.95" d="M34 40c2-4 7-7 12-7 2 0 4 0 5 1-2 1-3 3-4 5-3-1-6 0-13 1zm16 22c-4 2-9 3-13 1 1-2 3-3 6-4 1 2 4 3 7 3z"/>
+    <defs>
+      <radialGradient id="hf02Globe" cx="35%" cy="30%" r="70%">
+        <stop offset="0" stop-color="#FF6B6B"/>
+        <stop offset="0.55" stop-color="${red}"/>
+        <stop offset="1" stop-color="#8B0000"/>
+      </radialGradient>
+      <filter id="hf02GlobeSh" x="-12%" y="-12%" width="124%" height="124%">
+        <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.28"/>
+      </filter>
+    </defs>
+    <circle cx="48" cy="48" r="42" fill="url(#hf02Globe)" filter="url(#hf02GlobeSh)"/>
+    <ellipse cx="48" cy="48" rx="28" ry="11" fill="none" stroke="#fff" stroke-width="2.4"/>
+    <ellipse cx="48" cy="48" rx="11" ry="28" fill="none" stroke="#fff" stroke-width="2.4"/>
+    <path d="M18 48h60M48 18v60" stroke="#fff" stroke-width="1.6" opacity="0.75"/>
+    <path fill="#fff" opacity="0.95" d="M32 38c2-4 8-7 14-7 3 0 5 1 6 2-2 1-4 3-5 5-4-1-8 0-15 0zm18 24c-5 2-11 3-16 0 2-2 4-4 7-5 2 2 5 4 9 5z"/>
   </svg>`;
-  return rasterizeIcon(`globe-red-${red}`, svg, size);
+  return rasterizeIcon(`globe-red-v2-${red}`, svg, size);
 }
 
-/** Telefono blanco sobre circulo rojo — estilo HF02 */
-export async function getPhoneOnRedCircle(size: number, red = '#c50000'): Promise<Buffer> {
+/** Telefono blanco sobre circulo rojo realista — estilo HF02 */
+export async function getPhoneOnRedCircle(size: number, red = '#C40000'): Promise<Buffer> {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
-    <circle cx="48" cy="48" r="44" fill="${red}"/>
-    <path fill="#fff" d="M58 22H38c-3.3 0-6 2.7-6 6v40c0 3.3 2.7 6 6 6h20c3.3 0 6-2.7 6-6V28c0-3.3-2.7-6-6-6zm-10 52c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4zm10-32H38V32h20v10z"/>
+    <defs>
+      <radialGradient id="hf02Phone" cx="35%" cy="28%" r="72%">
+        <stop offset="0" stop-color="#FF6B6B"/>
+        <stop offset="0.55" stop-color="${red}"/>
+        <stop offset="1" stop-color="#8B0000"/>
+      </radialGradient>
+      <filter id="hf02PhoneSh" x="-12%" y="-12%" width="124%" height="124%">
+        <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.28"/>
+      </filter>
+    </defs>
+    <circle cx="48" cy="48" r="42" fill="url(#hf02Phone)" filter="url(#hf02PhoneSh)"/>
+    <path fill="#fff" d="M62 24H34c-2.8 0-5 2.2-5 5v38c0 2.8 2.2 5 5 5h28c2.8 0 5-2.2 5-5V29c0-2.8-2.2-5-5-5zm-14 54c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4zm14-34H34V34h28v10z"/>
   </svg>`;
-  return rasterizeIcon(`phone-red-${red}`, svg, size);
+  return rasterizeIcon(`phone-red-v2-${red}`, svg, size);
+}
+
+/** Pin de ubicacion rojo realista — estilo HF02 */
+export async function getLocationPinIcon(size: number, red = '#C40000'): Promise<Buffer> {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+    <defs>
+      <linearGradient id="hf02Pin" x1="48" y1="8" x2="48" y2="88" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#FF5252"/>
+        <stop offset="0.45" stop-color="${red}"/>
+        <stop offset="1" stop-color="#7A0000"/>
+      </linearGradient>
+      <filter id="hf02PinSh" x="-15%" y="-10%" width="130%" height="130%">
+        <feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-color="#000" flood-opacity="0.3"/>
+      </filter>
+    </defs>
+    <path filter="url(#hf02PinSh)" fill="url(#hf02Pin)" d="M48 10c-14.4 0-26 11.2-26 25 0 17.5 26 51 26 51s26-33.5 26-51C74 21.2 62.4 10 48 10zm0 34c-5.5 0-10-4.5-10-10s4.5-10 10-10 10 4.5 10 10-4.5 10-10 10z"/>
+    <circle cx="48" cy="34" r="7" fill="#fff" opacity="0.95"/>
+  </svg>`;
+  return rasterizeIcon(`pin-v2-${red}`, svg, size);
+}
+
+/** Rayo amarillo vertical decorativo — header HF02 */
+export async function getYellowLightningBolt(width: number, height: number, yellow = '#F2B705'): Promise<Buffer> {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 96">
+    <defs>
+      <linearGradient id="hf02Bolt" x1="24" y1="0" x2="24" y2="96" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#FFE082"/>
+        <stop offset="0.5" stop-color="${yellow}"/>
+        <stop offset="1" stop-color="#E6A800"/>
+      </linearGradient>
+      <filter id="hf02BoltSh" x="-20%" y="-5%" width="140%" height="110%">
+        <feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#000" flood-opacity="0.2"/>
+      </filter>
+    </defs>
+    <path filter="url(#hf02BoltSh)" fill="url(#hf02Bolt)" d="M26 4 L14 46 H22 L18 92 L34 38 H26 L30 4 Z"/>
+  </svg>`;
+  return rasterizeIcon(`bolt-yellow-${yellow}`, svg, height, width);
 }
