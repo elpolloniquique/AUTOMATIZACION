@@ -2,7 +2,7 @@ name: Publish Due Stories
 
 on:
   schedule:
-    - cron: '3-58/5 * * * *'
+    - cron: '* * * * *'
   workflow_dispatch:
 
 jobs:

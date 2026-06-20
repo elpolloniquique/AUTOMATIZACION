@@ -409,7 +409,7 @@ export default function PostCreatorPage() {
             />
 
             <div>
-              <Label>Fecha y hora programada</Label>
+              <Label>Fecha y hora programada (hora Chile)</Label>
               <Input type="datetime-local" {...register('scheduled_at')} />
             </div>
 

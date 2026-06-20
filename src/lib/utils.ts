@@ -8,26 +8,81 @@ export function cn(...inputs: ClassValue[]) {
 export function formatDate(date: string | null | undefined): string {
   if (!date) return '—';
   return new Date(date).toLocaleString('es-CL', {
+    timeZone: 'America/Santiago',
     dateStyle: 'short',
     timeStyle: 'short',
   });
 }
 
-/** Convierte ISO UTC a valor para input datetime-local (hora local del navegador). */
+/** Convierte ISO UTC a valor para input datetime-local (siempre hora Chile). */
 export function toDatetimeLocalValue(iso: string | null | undefined): string {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const parts = fmt.formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value || '00';
+  let hour = get('hour');
+  if (hour === '24') hour = '00';
+  return `${get('year')}-${get('month')}-${get('day')}T${hour}:${get('minute')}`;
 }
 
-/** Convierte datetime-local del navegador a ISO UTC para guardar en BD. */
+/** Convierte datetime-local (hora Chile) a ISO UTC para guardar en BD. */
 export function fromDatetimeLocalValue(value: string | undefined | null): string | null {
   if (!value) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString();
+  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  const [, ys, ms, ds, hs, mins] = m;
+  const y = Number(ys);
+  const mo = Number(ms);
+  const d = Number(ds);
+  const h = Number(hs);
+  const mi = Number(mins);
+  const tz = 'America/Santiago';
+
+  let lo = Date.UTC(y, mo - 1, d - 1, 3, 0);
+  let hi = Date.UTC(y, mo - 1, d + 1, 8, 0);
+
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  for (let i = 0; i < 48; i++) {
+    const mid = Math.floor((lo + hi) / 2);
+    const parts = fmt.formatToParts(new Date(mid));
+    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value || 0);
+    let ph = get('hour');
+    if (ph === 24) ph = 0;
+    const py = get('year');
+    const pmo = get('month');
+    const pd = get('day');
+    const pmi = get('minute');
+
+    const cmp = py !== y ? py - y : pmo !== mo ? pmo - mo : pd !== d ? pd - d : ph !== h ? ph - h : pmi - mi;
+    if (cmp === 0) return new Date(mid).toISOString();
+    if (cmp < 0) lo = mid + 1;
+    else hi = mid - 1;
+  }
+
+  const fallback = new Date(value);
+  return Number.isNaN(fallback.getTime()) ? null : fallback.toISOString();
 }
 
 export function getStatusColor(status: string): string {

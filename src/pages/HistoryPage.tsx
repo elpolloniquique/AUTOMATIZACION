@@ -30,6 +30,9 @@ export default function HistoryPage() {
   useEffect(() => {
     loadPosts();
     loadLogs();
+    const onAuto = () => loadPosts();
+    window.addEventListener('posts-auto-published', onAuto);
+    return () => window.removeEventListener('posts-auto-published', onAuto);
   }, [profile]);
 
   async function loadPosts() {

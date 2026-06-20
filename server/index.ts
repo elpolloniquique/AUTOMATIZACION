@@ -95,6 +95,12 @@ app.get('/api/cron/publish-due-stories', cronGuard, asyncHandler(async (_req, re
   res.json({ success: true, ...result });
 }));
 
+app.post('/api/posts/publish-due', authMiddleware, asyncHandler(async (req, res) => {
+  const branchId = req.user!.role === 'super_admin' ? undefined : req.user!.branchId || undefined;
+  const result = await publishDuePosts({ branchId });
+  res.json({ success: true, ...result });
+}));
+
 app.post('/api/posts/save', authMiddleware, asyncHandler(async (req, res) => {
   const schema = z.object({
     id: z.string().uuid().optional(),

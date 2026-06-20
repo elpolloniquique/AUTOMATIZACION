@@ -32,19 +32,20 @@ export interface PublishJobResult {
   details: Array<{ postId: string; platform: string; status: string; error?: string }>;
 }
 
-export async function publishDuePosts(): Promise<PublishJobResult> {
+export async function publishDuePosts(options?: { branchId?: string }): Promise<PublishJobResult> {
   const supabase = getSupabaseAdmin();
   const now = new Date().toISOString();
 
-  // Reparar posts programados sin aprobar que ya vencieron
-  await supabase
+  let repairQuery = supabase
     .from('posts')
     .update({ approval_status: 'approved', error_message: null })
     .eq('status', 'scheduled')
     .eq('approval_status', 'pending')
     .lte('scheduled_at', now);
+  if (options?.branchId) repairQuery = repairQuery.eq('branch_id', options.branchId);
+  await repairQuery;
 
-  const { data: posts, error } = await supabase
+  let query = supabase
     .from('posts')
     .select('*')
     .eq('status', 'scheduled')
@@ -52,18 +53,23 @@ export async function publishDuePosts(): Promise<PublishJobResult> {
     .lte('scheduled_at', now)
     .order('scheduled_at', { ascending: true })
     .limit(30);
+  if (options?.branchId) query = query.eq('branch_id', options.branchId);
+
+  const { data: posts, error } = await query;
 
   if (error) throw new Error(`Error buscando posts: ${error.message}`);
 
   const result: PublishJobResult = { processed: 0, published: 0, failed: 0, details: [] };
 
-  const { data: stillPending } = await supabase
+  let pendingQuery = supabase
     .from('posts')
     .select('id, title')
     .eq('status', 'scheduled')
     .eq('approval_status', 'pending')
     .lte('scheduled_at', now)
     .limit(10);
+  if (options?.branchId) pendingQuery = pendingQuery.eq('branch_id', options.branchId);
+  const { data: stillPending } = await pendingQuery;
 
   for (const p of stillPending || []) {
     result.details.push({

@@ -2,8 +2,8 @@ name: Publish Scheduled Posts
 
 on:
   schedule:
-    # Cada 5 minutos
-    - cron: '*/5 * * * *'
+    # Cada minuto — publicaciones programadas (máx. ~1 min de retraso)
+    - cron: '* * * * *'
   workflow_dispatch:
 
 jobs:
