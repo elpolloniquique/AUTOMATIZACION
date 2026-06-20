@@ -11,6 +11,8 @@ import { publishDueStories } from './jobs/publishDueStories.js';
 import {
   buildStoryPayload,
   publishSingleStory,
+  maybePublishStoryImmediately,
+  publishDueStories as publishDueStoriesService,
   type ScheduledStoryRow,
 } from './services/stories/scheduledStoryService.js';
 import { generateContent } from './services/ai/contentGenerator.js';
@@ -692,16 +694,37 @@ app.get('/api/dashboard/stats', authMiddleware, asyncHandler(async (req, res) =>
   res.json(stats);
 }));
 
-const scheduledStorySchema = z.object({
+const scheduledStoryBaseSchema = z.object({
   branch_id: z.string().uuid(),
   title: z.string().min(2),
   image_url: z.string().url(),
   gallery_item_id: z.string().uuid().optional().nullable(),
-  days_of_week: z.array(z.number().int().min(0).max(6)).min(1).optional(),
+  schedule_mode: z.enum(['recurring', 'once']).optional(),
+  scheduled_at: z.string().datetime().optional().nullable(),
+  days_of_week: z.array(z.number().int().min(0).max(6)).optional(),
   publish_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
   timezone: z.string().optional(),
   is_active: z.boolean().optional(),
 });
+
+function validateStorySchedule(data: z.infer<typeof scheduledStoryBaseSchema>, ctx: z.RefinementCtx) {
+  const mode = data.schedule_mode || 'recurring';
+  if (mode === 'once') {
+    if (!data.scheduled_at) {
+      ctx.addIssue({ code: 'custom', message: 'Indica fecha y hora para programación única', path: ['scheduled_at'] });
+    }
+  } else if (!data.days_of_week?.length) {
+    ctx.addIssue({ code: 'custom', message: 'Selecciona al menos un día', path: ['days_of_week'] });
+  }
+}
+
+const scheduledStorySchema = scheduledStoryBaseSchema.superRefine(validateStorySchedule);
+
+app.post('/api/scheduled-stories/publish-due', authMiddleware, asyncHandler(async (req, res) => {
+  const branchId = req.user!.role === 'super_admin' ? undefined : req.user!.branchId || undefined;
+  const result = await publishDueStoriesService({ branchId });
+  res.json({ success: true, ...result });
+}));
 
 app.get('/api/scheduled-stories', authMiddleware, asyncHandler(async (req, res) => {
   const supabase = getSupabaseAdmin();
@@ -731,14 +754,24 @@ app.post('/api/scheduled-stories', authMiddleware, roleGuard('super_admin', 'adm
   const payload = buildStoryPayload(parsed.data, req.user!.id);
   const { data, error } = await supabase.from('scheduled_stories').insert(payload).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  await maybePublishStoryImmediately(data as ScheduledStoryRow);
   res.json({ story: data });
 }));
 
 app.put('/api/scheduled-stories/:id', authMiddleware, roleGuard('super_admin', 'admin_sucursal'), asyncHandler(async (req, res) => {
-  const parsed = scheduledStorySchema.partial().extend({
+  const parsed = scheduledStoryBaseSchema.partial().extend({
     title: z.string().min(2).optional(),
     image_url: z.string().url().optional(),
     branch_id: z.string().uuid().optional(),
+  }).superRefine((data, ctx) => {
+    if (data.schedule_mode || data.scheduled_at !== undefined || data.days_of_week !== undefined) {
+      validateStorySchedule({
+        branch_id: data.branch_id || '00000000-0000-0000-0000-000000000001',
+        title: data.title || 'x',
+        image_url: data.image_url || 'https://example.com/x.png',
+        ...data,
+      }, ctx);
+    }
   }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: zodErrorMessage(parsed) });
 
@@ -752,6 +785,7 @@ app.put('/api/scheduled-stories/:id', authMiddleware, roleGuard('super_admin', '
   const payload = buildStoryPayload({ ...existing, ...parsed.data }, req.user!.id);
   const { data, error } = await supabase.from('scheduled_stories').update(payload).eq('id', id).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  await maybePublishStoryImmediately(data as ScheduledStoryRow);
   res.json({ story: data });
 }));
 

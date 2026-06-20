@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Clock, History, Plus, Save, Send, Trash2, BookImage } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
-import { apiFetch } from '@/lib/utils';
+import { apiFetch, formatDate, fromDatetimeLocalValue, toDatetimeLocalValue } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,6 +30,8 @@ const emptyForm = (branchId: string) => ({
   branch_id: branchId,
   image_url: '',
   gallery_item_id: null as string | null,
+  schedule_mode: 'recurring' as 'recurring' | 'once',
+  scheduled_at: '',
   days_of_week: [1, 2, 3, 4, 5, 6, 0] as number[],
   publish_time: '10:00',
   is_active: true,
@@ -118,6 +120,15 @@ export default function ScheduledStoriesPage() {
   useEffect(() => { loadStories(); }, [loadStories]);
   useEffect(() => { loadPublications(); }, [loadPublications]);
 
+  useEffect(() => {
+    const onAuto = () => {
+      loadStories();
+      loadPublications();
+    };
+    window.addEventListener('stories-auto-published', onAuto);
+    return () => window.removeEventListener('stories-auto-published', onAuto);
+  }, [loadStories, loadPublications]);
+
   function startNew() {
     setEditing(null);
     setForm(emptyForm(branchId));
@@ -126,11 +137,14 @@ export default function ScheduledStoriesPage() {
 
   function startEdit(story: ScheduledStory) {
     setEditing(story);
+    const mode = story.schedule_mode || 'recurring';
     setForm({
       title: story.title,
       branch_id: story.branch_id,
       image_url: story.image_url,
       gallery_item_id: story.gallery_item_id,
+      schedule_mode: mode,
+      scheduled_at: mode === 'once' ? toDatetimeLocalValue(story.scheduled_at) : '',
       days_of_week: story.days_of_week,
       publish_time: story.publish_time.slice(0, 5),
       is_active: story.is_active,
@@ -160,7 +174,12 @@ export default function ScheduledStoriesPage() {
 
     if (!form.title.trim()) return alert('Nombre requerido');
     if (!imageUrl) return alert('Selecciona una imagen de la galería');
-    if (form.days_of_week.length === 0) return alert('Selecciona al menos un día');
+    if (form.schedule_mode === 'recurring' && form.days_of_week.length === 0) {
+      return alert('Selecciona al menos un día');
+    }
+    if (form.schedule_mode === 'once' && !form.scheduled_at) {
+      return alert('Indica fecha y hora de publicación');
+    }
 
     setSaving(true);
     try {
@@ -169,7 +188,12 @@ export default function ScheduledStoriesPage() {
         branch_id: branchId,
         image_url: imageUrl,
         gallery_item_id: galleryItemId,
-        publish_time: form.publish_time.length === 5 ? `${form.publish_time}:00` : form.publish_time,
+        publish_time: form.schedule_mode === 'recurring'
+          ? (form.publish_time.length === 5 ? `${form.publish_time}:00` : form.publish_time)
+          : undefined,
+        scheduled_at: form.schedule_mode === 'once'
+          ? fromDatetimeLocalValue(form.scheduled_at)
+          : null,
         timezone: 'America/Santiago',
       };
 
@@ -224,6 +248,13 @@ export default function ScheduledStoriesPage() {
 
   function formatDays(days: number[]) {
     return DAY_OPTIONS.filter((d) => days.includes(d.value)).map((d) => d.label).join(', ');
+  }
+
+  function formatSchedule(story: ScheduledStory) {
+    if ((story.schedule_mode || 'recurring') === 'once' && story.scheduled_at) {
+      return `Una vez: ${formatDate(story.scheduled_at)}`;
+    }
+    return `${formatDays(story.days_of_week)} · ${story.publish_time.slice(0, 5)}`;
   }
 
   return (
@@ -285,7 +316,7 @@ export default function ScheduledStoriesPage() {
                   <img src={s.image_url} alt={s.title} className="w-16 h-28 object-cover rounded-lg border" />
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold truncate">{s.title}</h3>
-                    <p className="text-xs text-gray-500 mt-1">{formatDays(s.days_of_week)} · {s.publish_time.slice(0, 5)}</p>
+                    <p className="text-xs text-gray-500 mt-1">{formatSchedule(s)}</p>
                     {s.last_published_at && (
                       <p className="text-xs text-green-700 mt-1">Última: {new Date(s.last_published_at).toLocaleString('es-CL')}</p>
                     )}
@@ -337,31 +368,77 @@ export default function ScheduledStoriesPage() {
                 />
 
                 <div>
-                  <Label className="mb-2 block">Días de publicación</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {DAY_OPTIONS.map((d) => (
-                      <button
-                        key={d.value}
-                        type="button"
-                        onClick={() => toggleDay(d.value)}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                          form.days_of_week.includes(d.value)
-                            ? 'bg-pollon-red text-white border-pollon-red'
-                            : 'bg-white text-gray-600 border-gray-300 hover:border-pollon-red'
-                        }`}
-                      >
-                        {d.label}
-                      </button>
-                    ))}
+                  <Label className="mb-2 block">Tipo de programación</Label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, schedule_mode: 'recurring' })}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border ${
+                        form.schedule_mode === 'recurring'
+                          ? 'bg-pollon-red text-white border-pollon-red'
+                          : 'bg-white text-gray-600 border-gray-300'
+                      }`}
+                    >
+                      Recurrente (días + hora)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, schedule_mode: 'once' })}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border ${
+                        form.schedule_mode === 'once'
+                          ? 'bg-pollon-red text-white border-pollon-red'
+                          : 'bg-white text-gray-600 border-gray-300'
+                      }`}
+                    >
+                      Una sola fecha y hora
+                    </button>
                   </div>
                 </div>
 
-                <div>
-                  <Label>Hora de publicación (Chile)</Label>
-                  <Input type="time" value={form.publish_time}
-                    onChange={(e) => setForm({ ...form, publish_time: e.target.value })} />
-                  <p className="text-xs text-gray-500 mt-1">Zona horaria: America/Santiago. El cron revisa cada 5 minutos.</p>
-                </div>
+                {form.schedule_mode === 'once' ? (
+                  <div>
+                    <Label>Fecha y hora de publicación (hora Chile)</Label>
+                    <Input
+                      type="datetime-local"
+                      value={form.scheduled_at}
+                      onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Se publica automáticamente en esa fecha y hora (máx. ~1 minuto). Zona: America/Santiago.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <Label className="mb-2 block">Días de publicación</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {DAY_OPTIONS.map((d) => (
+                          <button
+                            key={d.value}
+                            type="button"
+                            onClick={() => toggleDay(d.value)}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                              form.days_of_week.includes(d.value)
+                                ? 'bg-pollon-red text-white border-pollon-red'
+                                : 'bg-white text-gray-600 border-gray-300 hover:border-pollon-red'
+                            }`}
+                          >
+                            {d.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Hora de publicación (Chile)</Label>
+                      <Input type="time" value={form.publish_time}
+                        onChange={(e) => setForm({ ...form, publish_time: e.target.value })} />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Se repite en los días seleccionados. Publicación automática cada minuto (máx. ~1 min de retraso).
+                      </p>
+                    </div>
+                  </>
+                )}
 
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={form.is_active}

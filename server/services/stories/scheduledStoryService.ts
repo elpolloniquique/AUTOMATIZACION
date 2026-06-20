@@ -16,6 +16,8 @@ export interface ScheduledStoryRow {
   title: string;
   image_url: string;
   gallery_item_id: string | null;
+  schedule_mode: 'recurring' | 'once';
+  scheduled_at: string | null;
   days_of_week: number[];
   publish_time: string;
   timezone: string;
@@ -111,6 +113,7 @@ export async function publishSingleStory(
         last_published_at: now,
         last_publish_error: null,
         updated_at: now,
+        ...((story.schedule_mode || 'recurring') === 'once' ? { is_active: false } : {}),
       }).eq('id', story.id);
 
       return { success: true, externalStoryId: result.externalStoryId };
@@ -165,20 +168,33 @@ async function recordPublication(
 
 export function isStoryDue(story: ScheduledStoryRow, force = false): boolean {
   if (!story.is_active && !force) return false;
+
+  const mode = story.schedule_mode || 'recurring';
+
+  if (mode === 'once') {
+    if (!story.scheduled_at) return false;
+    if (!force && story.last_published_at) return false;
+    if (force) return true;
+    return new Date(story.scheduled_at).getTime() <= Date.now();
+  }
+
   const now = getSantiagoNow();
-  if (!isDayScheduled(story.days_of_week, now.dayOfWeek)) return false;
-  if (!force && !isTimeInPublishWindow(now, story.publish_time)) return false;
+  if (!story.days_of_week?.length || !isDayScheduled(story.days_of_week, now.dayOfWeek)) return false;
+  if (!force && !isTimeInPublishWindow(now, story.publish_time, 2)) return false;
   if (!force && alreadyPublishedToday(story.last_published_at, now)) return false;
   return true;
 }
 
-export async function publishDueStories(): Promise<PublishStoryJobResult> {
+export async function publishDueStories(options?: { branchId?: string }): Promise<PublishStoryJobResult> {
   const supabase = getSupabaseAdmin();
-  const { data: stories, error } = await supabase
+  let query = supabase
     .from('scheduled_stories')
     .select('*')
     .eq('is_active', true)
     .order('publish_time');
+  if (options?.branchId) query = query.eq('branch_id', options.branchId);
+
+  const { data: stories, error } = await query;
 
   if (error) throw new Error(error.message);
 
@@ -211,9 +227,10 @@ export async function publishDueStories(): Promise<PublishStoryJobResult> {
 }
 
 export function buildStoryPayload(body: Record<string, unknown>, userId?: string) {
+  const mode = (body.schedule_mode as string) === 'once' ? 'once' : 'recurring';
   const days = Array.isArray(body.days_of_week)
     ? (body.days_of_week as number[]).map(Number)
-    : [1, 2, 3, 4, 5];
+    : [1, 2, 3, 4, 5, 6, 0];
 
   return {
     branch_id: body.branch_id,
@@ -221,10 +238,18 @@ export function buildStoryPayload(body: Record<string, unknown>, userId?: string
     title: body.title,
     image_url: body.image_url,
     gallery_item_id: body.gallery_item_id || null,
-    days_of_week: days,
-    publish_time: body.publish_time || '10:00',
+    schedule_mode: mode,
+    scheduled_at: mode === 'once' ? (body.scheduled_at as string) || null : null,
+    days_of_week: mode === 'once' ? [] : days,
+    publish_time: mode === 'once' ? '00:00:00' : (body.publish_time || '10:00:00'),
     timezone: body.timezone || 'America/Santiago',
     is_active: body.is_active !== false,
     updated_at: new Date().toISOString(),
   };
+}
+
+export async function maybePublishStoryImmediately(story: ScheduledStoryRow): Promise<void> {
+  if (isStoryDue(story)) {
+    await publishSingleStory(story);
+  }
 }

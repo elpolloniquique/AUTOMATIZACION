@@ -63,11 +63,11 @@ export function parseTimeToMinutes(time: string): number {
   return (h || 0) * 60 + (m || 0);
 }
 
-/** ¿Está la hora actual dentro de la ventana del cron (±toleranceMin)? */
+/** ¿Hora actual dentro de la ventana de publicación? (tolerancia en minutos) */
 export function isTimeInPublishWindow(
   now: SantiagoParts,
   publishTime: string,
-  toleranceMin = 5,
+  toleranceMin = 2,
 ): boolean {
   const nowMin = now.hour * 60 + now.minute;
   const targetMin = parseTimeToMinutes(publishTime);

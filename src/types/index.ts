@@ -112,6 +112,8 @@ export interface ScheduledStory {
   title: string;
   image_url: string;
   gallery_item_id: string | null;
+  schedule_mode?: 'recurring' | 'once';
+  scheduled_at?: string | null;
   days_of_week: number[];
   publish_time: string;
   timezone: string;

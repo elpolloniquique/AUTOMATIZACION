@@ -6,6 +6,7 @@ import {
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useScheduledPostsPublisher } from '@/hooks/useScheduledPostsPublisher';
+import { useScheduledStoriesPublisher } from '@/hooks/useScheduledStoriesPublisher';
 import { cn } from '@/lib/utils';
 import { ROLE_LABELS } from '@/types';
 
@@ -28,6 +29,7 @@ const navItems = [
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { profile, signOut } = useAuth();
   useScheduledPostsPublisher();
+  useScheduledStoriesPublisher();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
