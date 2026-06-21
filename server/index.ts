@@ -705,6 +705,9 @@ const scheduledStoryBaseSchema = z.object({
   publish_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
   timezone: z.string().optional(),
   is_active: z.boolean().optional(),
+  link_button_enabled: z.boolean().optional(),
+  link_button_text: z.string().min(1).max(30).optional(),
+  link_button_url: z.string().url().optional().nullable(),
 });
 
 function validateStorySchedule(data: z.infer<typeof scheduledStoryBaseSchema>, ctx: z.RefinementCtx) {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Clock, History, Plus, Save, Send, Trash2, BookImage } from 'lucide-react';
+import { Clock, History, Plus, Save, Send, Trash2, BookImage, Link2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { apiFetch, formatDate, fromDatetimeLocalValue, toDatetimeLocalValue } from '@/lib/utils';
@@ -10,6 +10,12 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { GallerySelectionBar } from '@/components/GallerySelectionBar';
 import type { Branch, MediaGalleryItem, ScheduledStory, StoryPublication } from '@/types';
+import {
+  DEFAULT_STORY_LINK_URL,
+  normalizeStoryLinkUrl,
+  resolveBranchWebsiteUrl,
+  STORY_LINK_BUTTON_LABELS,
+} from '@/constants/storyLinkButton';
 
 const DAY_OPTIONS = [
   { value: 1, label: 'Lun' },
@@ -25,7 +31,7 @@ interface GalleryPickState {
   selectedGalleryItems?: MediaGalleryItem[];
 }
 
-const emptyForm = (branchId: string) => ({
+const emptyForm = (branchId: string, branchWebsite?: string | null) => ({
   title: '',
   branch_id: branchId,
   image_url: '',
@@ -35,6 +41,9 @@ const emptyForm = (branchId: string) => ({
   days_of_week: [1, 2, 3, 4, 5, 6, 0] as number[],
   publish_time: '10:00',
   is_active: true,
+  link_button_enabled: true,
+  link_button_text: 'Comprar',
+  link_button_url: resolveBranchWebsiteUrl(branchWebsite),
 });
 
 export default function ScheduledStoriesPage() {
@@ -54,6 +63,8 @@ export default function ScheduledStoriesPage() {
   const canManage = profile?.role === 'super_admin' || profile?.role === 'admin_sucursal';
   const returnPath = '/stories';
   const branchesLoaded = useRef(false);
+  const selectedBranch = branches.find((b) => b.id === branchId);
+  const previewImageUrl = selectedGallery[0]?.public_url || form.image_url;
 
   function applyGalleryItem(item: MediaGalleryItem) {
     setSelectedGallery([item]);
@@ -77,7 +88,7 @@ export default function ScheduledStoriesPage() {
           if (prev.image_url || prev.title.trim()) {
             return { ...prev, branch_id: prev.branch_id || def };
           }
-          return emptyForm(def);
+          return emptyForm(def, data.find((b) => b.id === def)?.website);
         });
       }
     });
@@ -131,7 +142,7 @@ export default function ScheduledStoriesPage() {
 
   function startNew() {
     setEditing(null);
-    setForm(emptyForm(branchId));
+    setForm(emptyForm(branchId, selectedBranch?.website));
     setSelectedGallery([]);
   }
 
@@ -148,6 +159,9 @@ export default function ScheduledStoriesPage() {
       days_of_week: story.days_of_week,
       publish_time: story.publish_time.slice(0, 5),
       is_active: story.is_active,
+      link_button_enabled: story.link_button_enabled !== false,
+      link_button_text: story.link_button_text || 'Comprar',
+      link_button_url: story.link_button_url || DEFAULT_STORY_LINK_URL,
     });
     if (story.image_url) {
       setSelectedGallery([{
@@ -180,6 +194,17 @@ export default function ScheduledStoriesPage() {
     if (form.schedule_mode === 'once' && !form.scheduled_at) {
       return alert('Indica fecha y hora de publicación');
     }
+    if (form.link_button_enabled) {
+      const normalized = normalizeStoryLinkUrl(form.link_button_url);
+      if (!form.link_button_url?.trim()) {
+        return alert('Indica el enlace de tu página web para el botón');
+      }
+      try {
+        new URL(normalized);
+      } catch {
+        return alert('El enlace del botón no es una URL válida');
+      }
+    }
 
     setSaving(true);
     try {
@@ -188,6 +213,9 @@ export default function ScheduledStoriesPage() {
         branch_id: branchId,
         image_url: imageUrl,
         gallery_item_id: galleryItemId,
+        link_button_url: form.link_button_enabled
+          ? normalizeStoryLinkUrl(form.link_button_url)
+          : null,
         publish_time: form.schedule_mode === 'recurring'
           ? (form.publish_time.length === 5 ? `${form.publish_time}:00` : form.publish_time)
           : undefined,
@@ -276,8 +304,23 @@ export default function ScheduledStoriesPage() {
               className="border rounded-md h-10 px-3 min-w-[200px]"
               value={branchId}
               onChange={(e) => {
-                setBranchId(e.target.value);
-                setForm((f) => ({ ...emptyForm(e.target.value), title: f.title, image_url: f.image_url, gallery_item_id: f.gallery_item_id, days_of_week: f.days_of_week, publish_time: f.publish_time, is_active: f.is_active }));
+                const nextBranchId = e.target.value;
+                const nextBranch = branches.find((b) => b.id === nextBranchId);
+                setBranchId(nextBranchId);
+                setForm((f) => ({
+                  ...emptyForm(nextBranchId, nextBranch?.website),
+                  title: f.title,
+                  image_url: f.image_url,
+                  gallery_item_id: f.gallery_item_id,
+                  days_of_week: f.days_of_week,
+                  publish_time: f.publish_time,
+                  is_active: f.is_active,
+                  schedule_mode: f.schedule_mode,
+                  scheduled_at: f.scheduled_at,
+                  link_button_enabled: f.link_button_enabled,
+                  link_button_text: f.link_button_text,
+                  link_button_url: f.link_button_url || resolveBranchWebsiteUrl(nextBranch?.website),
+                }));
                 setEditing(null);
               }}
             >
@@ -317,6 +360,12 @@ export default function ScheduledStoriesPage() {
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold truncate">{s.title}</h3>
                     <p className="text-xs text-gray-500 mt-1">{formatSchedule(s)}</p>
+                    {s.link_button_enabled !== false && (
+                      <p className="text-xs text-blue-700 mt-1 flex items-center gap-1 truncate">
+                        <Link2 className="w-3 h-3 shrink-0" />
+                        {s.link_button_text || 'Comprar'} · {s.link_button_url || DEFAULT_STORY_LINK_URL}
+                      </p>
+                    )}
                     {s.last_published_at && (
                       <p className="text-xs text-green-700 mt-1">Última: {new Date(s.last_published_at).toLocaleString('es-CL')}</p>
                     )}
@@ -366,6 +415,90 @@ export default function ScheduledStoriesPage() {
                   }}
                   returnPath={returnPath}
                 />
+
+                <div className="rounded-xl border bg-gray-50/80 p-4 space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-sm flex items-center gap-2">
+                        <Link2 className="w-4 h-4 text-pollon-red" />
+                        Añadir botón
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Botón &quot;Enlace web&quot; como en Facebook. Texto por defecto: Comprar.
+                      </p>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={form.link_button_enabled}
+                        onChange={(e) => setForm({ ...form, link_button_enabled: e.target.checked })}
+                      />
+                      Activar
+                    </label>
+                  </div>
+
+                  {form.link_button_enabled && (
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-xs text-gray-600">Tipo de botón</Label>
+                        <div className="mt-1 px-3 py-2 rounded-lg border bg-white text-sm text-gray-700">
+                          Botón &quot;Enlace web&quot;
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label>Texto del botón</Label>
+                        <select
+                          className="mt-1 w-full border rounded-md h-10 px-3 bg-white"
+                          value={form.link_button_text}
+                          onChange={(e) => setForm({ ...form, link_button_text: e.target.value })}
+                        >
+                          {STORY_LINK_BUTTON_LABELS.map((label) => (
+                            <option key={label} value={label}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <Label>Introducir enlace</Label>
+                        <div className="relative mt-1">
+                          <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <Input
+                            className="pl-9"
+                            value={form.link_button_url}
+                            onChange={(e) => setForm({ ...form, link_button_url: e.target.value })}
+                            placeholder="https://www.el-pollon.cl/"
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          URL de tu página web. Se usa como referencia y se muestra el botón en la imagen al publicar.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {previewImageUrl && (
+                  <div>
+                    <Label className="mb-2 block">Vista previa</Label>
+                    <div className="mx-auto w-full max-w-[220px]">
+                      <div className="relative aspect-[9/16] rounded-2xl overflow-hidden border shadow-md bg-black">
+                        <img
+                          src={previewImageUrl}
+                          alt="Vista previa historia"
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                        {form.link_button_enabled && (
+                          <div className="absolute inset-x-0 bottom-10 flex justify-center px-4 pointer-events-none">
+                            <span className="bg-white text-[#050505] text-sm font-semibold px-6 py-2.5 rounded-full shadow-lg">
+                              {form.link_button_text || 'Comprar'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <Label className="mb-2 block">Tipo de programación</Label>

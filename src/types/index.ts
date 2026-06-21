@@ -118,6 +118,9 @@ export interface ScheduledStory {
   publish_time: string;
   timezone: string;
   is_active: boolean;
+  link_button_enabled?: boolean;
+  link_button_text?: string;
+  link_button_url?: string | null;
   last_published_at: string | null;
   last_publish_error: string | null;
   created_at: string;

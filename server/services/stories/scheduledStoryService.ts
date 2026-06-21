@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { getSupabaseAdmin } from '../../utils/supabase.js';
 import { publishStoryWithRetry } from '../meta/facebookStoryPublisher.js';
 import { prepareStoryImagePublicUrl } from './storyImageAdapter.js';
+import { normalizeStoryLinkUrl } from './storyLinkButtonOverlay.js';
 import {
   alreadyPublishedToday,
   getSantiagoNow,
@@ -22,6 +23,9 @@ export interface ScheduledStoryRow {
   publish_time: string;
   timezone: string;
   is_active: boolean;
+  link_button_enabled: boolean;
+  link_button_text: string;
+  link_button_url: string | null;
   last_published_at: string | null;
   last_publish_error: string | null;
   created_at: string;
@@ -90,7 +94,11 @@ export async function publishSingleStory(
   });
 
   try {
-    const storyImageUrl = await prepareStoryImagePublicUrl(story.image_url, story.id);
+    const storyImageUrl = await prepareStoryImagePublicUrl(story.image_url, story.id, {
+      enabled: story.link_button_enabled !== false,
+      text: story.link_button_text || 'Comprar',
+      url: normalizeStoryLinkUrl(story.link_button_url),
+    });
 
     const result = await publishStoryWithRetry({
       pageId: account.account_id,
@@ -232,6 +240,9 @@ export function buildStoryPayload(body: Record<string, unknown>, userId?: string
     ? (body.days_of_week as number[]).map(Number)
     : [1, 2, 3, 4, 5, 6, 0];
 
+  const linkEnabled = body.link_button_enabled !== false;
+  const linkText = String(body.link_button_text || 'Comprar').trim().slice(0, 30) || 'Comprar';
+
   return {
     branch_id: body.branch_id,
     created_by: userId || body.created_by || null,
@@ -244,6 +255,9 @@ export function buildStoryPayload(body: Record<string, unknown>, userId?: string
     publish_time: mode === 'once' ? '00:00:00' : (body.publish_time || '10:00:00'),
     timezone: body.timezone || 'America/Santiago',
     is_active: body.is_active !== false,
+    link_button_enabled: linkEnabled,
+    link_button_text: linkText,
+    link_button_url: linkEnabled ? normalizeStoryLinkUrl(body.link_button_url as string | null) : null,
     updated_at: new Date().toISOString(),
   };
 }

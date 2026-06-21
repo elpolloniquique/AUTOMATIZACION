@@ -2,9 +2,15 @@ import axios from 'axios';
 import sharp from 'sharp';
 import { config } from '../../config/index.js';
 import { getSupabaseAdmin } from '../../utils/supabase.js';
+import {
+  applyStoryLinkButtonOverlay,
+  type StoryLinkButtonConfig,
+} from './storyLinkButtonOverlay.js';
 
 const STORY_W = 1080;
 const STORY_H = 1920;
+
+export type { StoryLinkButtonConfig };
 
 export async function downloadImageBuffer(url: string): Promise<Buffer> {
   const { data } = await axios.get(url.split('?')[0], {
@@ -24,9 +30,17 @@ export async function adaptImageToStoryFormat(sourceBuffer: Buffer): Promise<Buf
     .toBuffer();
 }
 
-export async function prepareStoryImagePublicUrl(imageUrl: string, storyId?: string): Promise<string> {
+export async function prepareStoryImagePublicUrl(
+  imageUrl: string,
+  storyId?: string,
+  linkButton?: StoryLinkButtonConfig,
+): Promise<string> {
   const buffer = await downloadImageBuffer(imageUrl);
-  const adapted = await adaptImageToStoryFormat(buffer);
+  let adapted = await adaptImageToStoryFormat(buffer);
+
+  if (linkButton?.enabled && linkButton.text) {
+    adapted = await applyStoryLinkButtonOverlay(adapted, linkButton.text);
+  }
 
   const supabase = getSupabaseAdmin();
   const fileName = `stories/story-${storyId || 'temp'}-${Date.now()}.jpg`;
