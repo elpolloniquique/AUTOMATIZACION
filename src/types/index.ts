@@ -164,6 +164,11 @@ export interface Post {
   caption: string | null;
   hashtags: string[] | null;
   cta: string | null;
+  action_button_enabled?: boolean;
+  action_button_type?: 'website' | 'whatsapp';
+  action_button_text?: string | null;
+  action_button_url?: string | null;
+  action_button_whatsapp_message?: string | null;
   platform: Platform;
   post_type: PostType;
   media_url: string | null;

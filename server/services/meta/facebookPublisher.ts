@@ -1,8 +1,15 @@
 import axios from 'axios';
 import { config } from '../../config/index.js';
 import { createPostLog, sanitizeForLog } from '../../utils/logger.js';
+import {
+  type FacebookActionButtonConfig,
+  mapButtonTextToCtaType,
+  resolveFacebookActionLink,
+} from './facebookPostActionButton.js';
 
 const GRAPH_BASE = `https://graph.facebook.com/${config.meta.graphVersion}`;
+
+export type { FacebookActionButtonConfig };
 
 export interface FacebookPublishParams {
   postId: string;
@@ -10,6 +17,7 @@ export interface FacebookPublishParams {
   accessToken: string;
   message: string;
   imageUrl: string;
+  actionButton?: FacebookActionButtonConfig;
 }
 
 export interface PublishResult {
@@ -18,36 +26,96 @@ export interface PublishResult {
   error?: string;
 }
 
-export async function publishToFacebook(params: FacebookPublishParams): Promise<PublishResult> {
+async function publishPhotoPost(params: FacebookPublishParams): Promise<PublishResult> {
   const { postId, pageId, accessToken, message, imageUrl } = params;
+  const response = await axios.post(
+    `${GRAPH_BASE}/${pageId}/photos`,
+    null,
+    {
+      params: {
+        url: imageUrl,
+        caption: message,
+        access_token: accessToken,
+      },
+      timeout: 25000,
+    },
+  );
+  const externalPostId = response.data?.id || response.data?.post_id;
+  await createPostLog({
+    postId,
+    platform: 'facebook',
+    action: 'publish',
+    status: 'success',
+    requestPayload: sanitizeForLog({ mode: 'photo', pageId, message: message.slice(0, 100), imageUrl }),
+    responsePayload: sanitizeForLog(response.data),
+  });
+  return { success: true, externalPostId };
+}
+
+async function publishLinkPostWithCta(params: FacebookPublishParams): Promise<PublishResult> {
+  const { postId, pageId, accessToken, message, imageUrl, actionButton } = params;
+  if (!actionButton?.enabled) throw new Error('Botón de acción no configurado');
+
+  const actionLink = resolveFacebookActionLink(actionButton);
+  const ctaType = mapButtonTextToCtaType(actionButton.text);
+
+  const response = await axios.post(
+    `${GRAPH_BASE}/${pageId}/feed`,
+    null,
+    {
+      params: {
+        message,
+        link: actionLink,
+        picture: imageUrl,
+        call_to_action: JSON.stringify({
+          type: ctaType,
+          value: { link: actionLink },
+        }),
+        access_token: accessToken,
+      },
+      timeout: 25000,
+    },
+  );
+
+  const externalPostId = response.data?.id || response.data?.post_id;
+  await createPostLog({
+    postId,
+    platform: 'facebook',
+    action: 'publish',
+    status: 'success',
+    requestPayload: sanitizeForLog({
+      mode: 'feed_cta',
+      pageId,
+      link: actionLink,
+      ctaType,
+      message: message.slice(0, 100),
+      imageUrl,
+    }),
+    responsePayload: sanitizeForLog(response.data),
+  });
+  return { success: true, externalPostId };
+}
+
+export async function publishToFacebook(params: FacebookPublishParams): Promise<PublishResult> {
+  const { postId, pageId, actionButton } = params;
 
   try {
-    // Paso 1: Publicar foto con caption
-    const response = await axios.post(
-      `${GRAPH_BASE}/${pageId}/photos`,
-      null,
-      {
-        params: {
-          url: imageUrl,
-          caption: message,
-          access_token: accessToken,
-        },
-        timeout: 20000,
+    if (actionButton?.enabled) {
+      try {
+        return await publishLinkPostWithCta(params);
+      } catch (feedErr) {
+        const feedError = extractAxiosError(feedErr);
+        await createPostLog({
+          postId,
+          platform: 'facebook',
+          action: 'publish_feed_cta_fallback',
+          status: 'failed',
+          errorMessage: feedError,
+        });
+        return await publishPhotoPost(params);
       }
-    );
-
-    const externalPostId = response.data?.id || response.data?.post_id;
-
-    await createPostLog({
-      postId,
-      platform: 'facebook',
-      action: 'publish',
-      status: 'success',
-      requestPayload: sanitizeForLog({ pageId, message: message.slice(0, 100), imageUrl }),
-      responsePayload: sanitizeForLog(response.data),
-    });
-
-    return { success: true, externalPostId };
+    }
+    return await publishPhotoPost(params);
   } catch (err: unknown) {
     const errorMessage = extractAxiosError(err);
     await createPostLog({
@@ -77,7 +145,10 @@ export async function testFacebookConnection(pageId: string, accessToken: string
 function extractAxiosError(err: unknown): string {
   if (axios.isAxiosError(err)) {
     const apiError = err.response?.data?.error;
-    if (apiError?.message) return apiError.message;
+    if (apiError?.message) {
+      const sub = apiError.error_user_msg || apiError.error_user_title;
+      return sub ? `${apiError.message} — ${sub}` : apiError.message;
+    }
     return err.message;
   }
   return err instanceof Error ? err.message : 'Error desconocido';

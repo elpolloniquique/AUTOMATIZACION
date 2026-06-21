@@ -1,12 +1,13 @@
 import { getSupabaseAdmin } from '../../utils/supabase.js';
 import { publishSinglePost } from '../../jobs/publishDuePosts.js';
+import { normalizeStoryLinkUrl } from '../stories/storyLinkButtonOverlay.js';
 import type { UserRole } from '../../types.js';
 
 export function canAutoApprove(role: UserRole): boolean {
   return role === 'super_admin' || role === 'admin_sucursal' || role === 'aprobador';
 }
 
-/** true si la hora programada ya llegó (o no hay fecha → publicar ya) */
+/** true si la hora programada ya lleg? (o no hay fecha ��� publicar ya) */
 export function isPublishDue(scheduledAt: string | null | undefined): boolean {
   if (!scheduledAt) return true;
   return new Date(scheduledAt).getTime() <= Date.now();
@@ -45,6 +46,11 @@ export interface SavePostInput {
   media_urls?: string[] | null;
   gallery_item_ids?: string[] | null;
   image_mode?: string | null;
+  action_button_enabled?: boolean;
+  action_button_type?: 'website' | 'whatsapp';
+  action_button_text?: string | null;
+  action_button_url?: string | null;
+  action_button_whatsapp_message?: string | null;
   schedule: boolean;
   userRole: UserRole;
   userId: string;
@@ -90,7 +96,7 @@ export async function saveAndSchedulePost(input: SavePostInput): Promise<SavePos
   if (input.schedule && input.platform !== 'tiktok') {
     const hasImage = Boolean(input.generated_image_url);
     if (!hasImage) {
-      throw new Error('Genera o selecciona una imagen antes de programar la publicación');
+      throw new Error('Genera o selecciona una imagen antes de programar la publicaci?n');
     }
   }
 
@@ -126,6 +132,15 @@ export async function saveAndSchedulePost(input: SavePostInput): Promise<SavePos
     media_urls: input.media_urls || null,
     gallery_item_ids: input.gallery_item_ids || null,
     image_mode: input.image_mode || null,
+    action_button_enabled: input.platform === 'facebook' && input.action_button_enabled === true,
+    action_button_type: input.action_button_type === 'whatsapp' ? 'whatsapp' : 'website',
+    action_button_text: (input.action_button_text || 'Comprar').trim().slice(0, 30) || 'Comprar',
+    action_button_url: input.platform === 'facebook'
+      && input.action_button_enabled
+      && input.action_button_type !== 'whatsapp'
+      ? normalizeStoryLinkUrl(input.action_button_url)
+      : null,
+    action_button_whatsapp_message: input.action_button_whatsapp_message || null,
     status,
     approval_status,
     error_message: null,
@@ -141,11 +156,11 @@ export async function saveAndSchedulePost(input: SavePostInput): Promise<SavePos
       .eq('id', input.id)
       .select('*')
       .single();
-    if (error || !data) throw new Error(error?.message || 'Error al actualizar publicación');
+    if (error || !data) throw new Error(error?.message || 'Error al actualizar publicaci?n');
     post = data;
   } else {
     const { data, error } = await supabase.from('posts').insert(row).select('*').single();
-    if (error || !data) throw new Error(error?.message || 'Error al crear publicación');
+    if (error || !data) throw new Error(error?.message || 'Error al crear publicaci?n');
     post = data;
   }
 
@@ -157,8 +172,8 @@ export async function saveAndSchedulePost(input: SavePostInput): Promise<SavePos
       published_now: true,
       publish_result: publishResult,
       message: publishResult.success
-        ? 'Publicación programada y publicada en la red social'
-        : `Programada pero falló al publicar: ${publishResult.error || 'Error desconocido'}`,
+        ? 'Publicaci?n programada y publicada en la red social'
+        : `Programada pero fall? al publicar: ${publishResult.error || 'Error desconocido'}`,
     };
   }
 
@@ -167,14 +182,14 @@ export async function saveAndSchedulePost(input: SavePostInput): Promise<SavePos
       post,
       published_now: false,
       message: input.scheduled_at
-        ? `Publicación programada para ${new Date(input.scheduled_at).toLocaleString('es-CL')}. Se publicará automáticamente en esa hora.`
-        : 'Publicación programada',
+        ? `Publicaci?n programada para ${new Date(input.scheduled_at).toLocaleString('es-CL')}. Se publicar? autom?ticamente en esa hora.`
+        : 'Publicaci?n programada',
     };
   }
 
   return {
     post,
     published_now: false,
-    message: input.schedule ? 'Enviada a aprobación' : 'Borrador guardado',
+    message: input.schedule ? 'Enviada a aprobaci?n' : 'Borrador guardado',
   };
 }

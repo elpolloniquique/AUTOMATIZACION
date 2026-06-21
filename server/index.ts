@@ -123,6 +123,11 @@ app.post('/api/posts/save', authMiddleware, asyncHandler(async (req, res) => {
     schedule: z.boolean(),
     preserve_status: z.string().optional(),
     preserve_approval_status: z.string().optional(),
+    action_button_enabled: z.boolean().optional(),
+    action_button_type: z.enum(['website', 'whatsapp']).optional(),
+    action_button_text: z.string().min(1).max(30).optional(),
+    action_button_url: z.string().url().optional().nullable(),
+    action_button_whatsapp_message: z.string().max(500).optional().nullable(),
   });
 
   const parsed = schema.safeParse(req.body);
@@ -152,6 +157,11 @@ app.post('/api/posts/save', authMiddleware, asyncHandler(async (req, res) => {
       media_urls: parsed.data.media_urls,
       gallery_item_ids: parsed.data.gallery_item_ids,
       image_mode: parsed.data.image_mode,
+      action_button_enabled: parsed.data.action_button_enabled,
+      action_button_type: parsed.data.action_button_type,
+      action_button_text: parsed.data.action_button_text,
+      action_button_url: parsed.data.action_button_url,
+      action_button_whatsapp_message: parsed.data.action_button_whatsapp_message,
       schedule: parsed.data.schedule,
       userRole: req.user!.role,
       userId: req.user!.id,

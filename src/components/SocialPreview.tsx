@@ -1,4 +1,10 @@
+import { Link2, MessageCircle } from 'lucide-react';
 import { PLATFORM_LABELS, type Platform } from '@/types';
+
+interface ActionButtonPreview {
+  text: string;
+  type: 'website' | 'whatsapp';
+}
 
 interface SocialPreviewProps {
   platform: Platform;
@@ -7,9 +13,18 @@ interface SocialPreviewProps {
   imageUrl?: string;
   imageUrls?: string[];
   hashtags?: string[];
+  actionButton?: ActionButtonPreview;
 }
 
-export function SocialPreview({ platform, title, caption, imageUrl, imageUrls, hashtags }: SocialPreviewProps) {
+export function SocialPreview({
+  platform,
+  title,
+  caption,
+  imageUrl,
+  imageUrls,
+  hashtags,
+  actionButton,
+}: SocialPreviewProps) {
   const fullText = [caption, hashtags?.map((h) => (h.startsWith('#') ? h : `#${h}`)).join(' ')].filter(Boolean).join('\n\n');
   const carousel = imageUrls && imageUrls.length > 1 ? imageUrls : null;
   const mainImage = imageUrl || carousel?.[0];
@@ -40,6 +55,21 @@ export function SocialPreview({ platform, title, caption, imageUrl, imageUrls, h
     return <div className={`bg-gray-100 flex items-center justify-center text-gray-400 ${className}`}>Sin imagen</div>;
   }
 
+  function renderFacebookActionButton() {
+    if (!actionButton || platform !== 'facebook') return null;
+    const isWa = actionButton.type === 'whatsapp';
+    return (
+      <div className="px-3 pb-3">
+        <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold ${
+          isWa ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-900 border'
+        }`}>
+          {isWa ? <MessageCircle className="w-4 h-4" /> : <Link2 className="w-4 h-4" />}
+          {actionButton.text}
+        </div>
+      </div>
+    );
+  }
+
   if (platform === 'instagram') {
     return (
       <div className="bg-white border rounded-lg overflow-hidden max-w-sm mx-auto shadow">
@@ -65,7 +95,6 @@ export function SocialPreview({ platform, title, caption, imageUrl, imageUrls, h
     );
   }
 
-  // Facebook / Google default
   return (
     <div className="bg-white border rounded-lg overflow-hidden max-w-md mx-auto shadow">
       <div className="p-3 flex items-center gap-2">
@@ -77,6 +106,7 @@ export function SocialPreview({ platform, title, caption, imageUrl, imageUrls, h
       </div>
       <p className="px-3 pb-2 text-sm whitespace-pre-wrap">{fullText || title}</p>
       {renderImages('w-full object-cover max-h-96')}
+      {renderFacebookActionButton()}
     </div>
   );
 }

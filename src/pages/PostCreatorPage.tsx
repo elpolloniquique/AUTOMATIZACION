@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Sparkles, Image, Save } from 'lucide-react';
+import { Sparkles, Image, Save, Link2, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { apiFetch, fromDatetimeLocalValue, toDatetimeLocalValue } from '@/lib/utils';
@@ -17,6 +17,12 @@ import { GallerySelectionBar } from '@/components/GallerySelectionBar';
 import type { Branch, Platform, PostType, ImageGenerateMode, ImageGenerateResult, MediaGalleryItem, Post, BrandFrameTemplate } from '@/types';
 import { PLATFORM_LABELS, POST_TYPE_LABELS } from '@/types';
 import { POLLON_CONTACT } from '@/constants/pollonBrand';
+import {
+  DEFAULT_WHATSAPP_MESSAGE,
+  POST_ACTION_BUTTON_LABELS,
+  defaultPostActionButton,
+  normalizeStoryLinkUrl,
+} from '@/constants/postActionButton';
 
 const postSchema = z.object({
   branch_id: z.string().uuid(),
@@ -30,6 +36,11 @@ const postSchema = z.object({
   price: z.string().optional(),
   product_name: z.string().optional(),
   template_slug: z.string().optional(),
+  action_button_enabled: z.boolean().optional(),
+  action_button_type: z.enum(['website', 'whatsapp']).optional(),
+  action_button_text: z.string().optional(),
+  action_button_url: z.string().optional(),
+  action_button_whatsapp_message: z.string().optional(),
 });
 
 type PostForm = z.infer<typeof postSchema>;
@@ -71,10 +82,16 @@ export default function PostCreatorPage() {
       platform: 'facebook',
       post_type: 'oferta',
       branch_id: profile?.branch_id || '',
+      action_button_enabled: true,
+      action_button_type: 'website',
+      action_button_text: 'Comprar',
+      action_button_url: 'https://www.el-pollon.cl/',
+      action_button_whatsapp_message: DEFAULT_WHATSAPP_MESSAGE,
     },
   });
 
   const watched = watch();
+  const selectedBranch = branches.find((b) => b.id === watched.branch_id);
 
   useEffect(() => {
     if (!session?.access_token || !watched.branch_id) {
@@ -125,6 +142,14 @@ export default function PostCreatorPage() {
     if (id) loadPost(id);
   }, [id]);
 
+  useEffect(() => {
+    if (!watched.branch_id || id) return;
+    const branch = branches.find((b) => b.id === watched.branch_id);
+    if (!branch) return;
+    const defaults = defaultPostActionButton(branch.website);
+    setValue('action_button_url', defaults.action_button_url);
+  }, [watched.branch_id, branches, id, setValue]);
+
   async function loadPost(postId: string) {
     const { data } = await supabase.from('posts').select('*').eq('id', postId).single();
     if (data) {
@@ -139,6 +164,11 @@ export default function PostCreatorPage() {
         scheduled_at: toDatetimeLocalValue(data.scheduled_at),
         price: data.price || '',
         product_name: data.product_name || '',
+        action_button_enabled: data.action_button_enabled === true,
+        action_button_type: data.action_button_type === 'whatsapp' ? 'whatsapp' : 'website',
+        action_button_text: data.action_button_text || 'Comprar',
+        action_button_url: data.action_button_url || 'https://www.el-pollon.cl/',
+        action_button_whatsapp_message: data.action_button_whatsapp_message || DEFAULT_WHATSAPP_MESSAGE,
       });
       setImageUrl(data.generated_image_url || data.media_url || '');
       setMediaUrls(data.media_urls || []);
@@ -289,6 +319,16 @@ export default function PostCreatorPage() {
       alert('Genera o selecciona una imagen antes de programar');
       return;
     }
+    if (data.platform === 'facebook' && data.action_button_enabled) {
+      if (data.action_button_type === 'website' && !data.action_button_url?.trim()) {
+        alert('Indica la URL de tu página web para el botón');
+        return;
+      }
+      if (data.action_button_type === 'whatsapp' && !data.action_button_whatsapp_message?.trim()) {
+        alert('Indica el mensaje automático de WhatsApp');
+        return;
+      }
+    }
 
     setSaving(true);
     const hashtags = data.hashtags?.split(',').map((h) => h.trim().replace(/^#/, '')).filter(Boolean) || [];
@@ -318,6 +358,15 @@ export default function PostCreatorPage() {
           gallery_item_ids: selectedGallery.length ? selectedGallery.map((g) => g.id) : null,
           image_mode: imageMode,
           schedule,
+          action_button_enabled: data.platform === 'facebook' && data.action_button_enabled === true,
+          action_button_type: data.action_button_type || 'website',
+          action_button_text: data.action_button_text || 'Comprar',
+          action_button_url: data.action_button_type === 'website'
+            ? normalizeStoryLinkUrl(data.action_button_url)
+            : null,
+          action_button_whatsapp_message: data.action_button_type === 'whatsapp'
+            ? (data.action_button_whatsapp_message || DEFAULT_WHATSAPP_MESSAGE)
+            : null,
           preserve_status: !schedule ? originalPost?.status : undefined,
           preserve_approval_status: !schedule ? originalPost?.approval_status : undefined,
         }),
@@ -396,9 +445,105 @@ export default function PostCreatorPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div><Label>CTA</Label><Input {...register('cta')} placeholder={POLLON_CONTACT.defaultCta} /></div>
+              <div><Label>CTA texto</Label><Input {...register('cta')} placeholder={POLLON_CONTACT.defaultCta} /></div>
               <div><Label>Precio</Label><Input {...register('price')} placeholder="$19.990" /></div>
             </div>
+
+            {watched.platform === 'facebook' && (
+              <div className="rounded-xl border bg-gray-50/80 p-4 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-sm flex items-center gap-2">
+                      <Link2 className="w-4 h-4 text-pollon-red" />
+                      Botón de compra / acción
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Enlace a tu web o WhatsApp con mensaje automático. Se publica como botón en Facebook.
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(watched.action_button_enabled)}
+                      onChange={(e) => setValue('action_button_enabled', e.target.checked)}
+                    />
+                    Activar
+                  </label>
+                </div>
+
+                {watched.action_button_enabled && (
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="mb-2 block">Destino del botón</Label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setValue('action_button_type', 'website')}
+                          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border flex items-center justify-center gap-1.5 ${
+                            watched.action_button_type !== 'whatsapp'
+                              ? 'bg-pollon-red text-white border-pollon-red'
+                              : 'bg-white text-gray-600 border-gray-300'
+                          }`}
+                        >
+                          <Link2 className="w-4 h-4" /> Página web
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setValue('action_button_type', 'whatsapp')}
+                          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border flex items-center justify-center gap-1.5 ${
+                            watched.action_button_type === 'whatsapp'
+                              ? 'bg-green-600 text-white border-green-600'
+                              : 'bg-white text-gray-600 border-gray-300'
+                          }`}
+                        >
+                          <MessageCircle className="w-4 h-4" /> WhatsApp
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Texto del botón</Label>
+                      <select
+                        className="mt-1 w-full border rounded-md h-10 px-3 bg-white"
+                        value={watched.action_button_text || 'Comprar'}
+                        onChange={(e) => setValue('action_button_text', e.target.value)}
+                      >
+                        {POST_ACTION_BUTTON_LABELS.map((label) => (
+                          <option key={label} value={label}>{label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {watched.action_button_type === 'whatsapp' ? (
+                      <div>
+                        <Label>Mensaje automático de WhatsApp</Label>
+                        <textarea
+                          className="w-full border rounded-md p-3 min-h-[80px] text-sm mt-1"
+                          {...register('action_button_whatsapp_message')}
+                          placeholder={DEFAULT_WHATSAPP_MESSAGE}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Al pulsar el botón se abre WhatsApp con este mensaje prellenado
+                          {selectedBranch?.whatsapp ? ` (${selectedBranch.whatsapp})` : ''}.
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <Label>Enlace de tu página web</Label>
+                        <div className="relative mt-1">
+                          <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <Input
+                            className="pl-9"
+                            {...register('action_button_url')}
+                            placeholder="https://www.el-pollon.cl/"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             <HashtagEditor
               value={watched.hashtags || ''}
@@ -606,6 +751,10 @@ export default function PostCreatorPage() {
                 imageUrl={imageUrl}
                 imageUrls={mediaUrls.length > 1 ? mediaUrls : undefined}
                 hashtags={watched.hashtags?.split(',').map((h) => h.trim())}
+                actionButton={watched.platform === 'facebook' && watched.action_button_enabled ? {
+                  text: watched.action_button_text || 'Comprar',
+                  type: watched.action_button_type === 'whatsapp' ? 'whatsapp' : 'website',
+                } : undefined}
               />
             </CardContent>
           </Card>

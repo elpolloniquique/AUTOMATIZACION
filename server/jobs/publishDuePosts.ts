@@ -1,6 +1,10 @@
 import { getSupabaseAdmin } from '../utils/supabase.js';
 import { publishWithRetry as publishFacebook } from '../services/meta/facebookPublisher.js';
 import { appendPollonContact } from '../constants/pollonBrand.js';
+import {
+  buildActionCaptionLine,
+  type FacebookActionButtonConfig,
+} from '../services/meta/facebookPostActionButton.js';
 import { publishToInstagram } from '../services/meta/instagramPublisher.js';
 import { publishToTikTok } from '../services/tiktok/tiktokPublisher.js';
 import { publishToGoogleBusiness } from '../services/google-business/googleBusinessPublisher.js';
@@ -16,6 +20,11 @@ interface PostRow {
   platform: string;
   generated_image_url: string | null;
   media_url: string | null;
+  action_button_enabled?: boolean;
+  action_button_type?: string;
+  action_button_text?: string | null;
+  action_button_url?: string | null;
+  action_button_whatsapp_message?: string | null;
 }
 
 interface SocialAccount {
@@ -141,15 +150,27 @@ export async function publishSinglePost(post: PostRow): Promise<{ success: boole
   let publishResult: { success: boolean; externalPostId?: string; error?: string };
 
   switch (post.platform) {
-    case 'facebook':
+    case 'facebook': {
+      let whatsappPhone: string | undefined;
+      if (post.action_button_enabled && post.action_button_type === 'whatsapp') {
+        const { data: branch } = await supabase
+          .from('branches')
+          .select('whatsapp')
+          .eq('id', post.branch_id)
+          .maybeSingle();
+        whatsappPhone = branch?.whatsapp || undefined;
+      }
+      const actionButton = buildFacebookActionButton(post, whatsappPhone);
       publishResult = await publishFacebook({
         postId: post.id,
         pageId: account.account_id,
         accessToken: account.access_token,
         message,
         imageUrl: imageUrl!,
+        actionButton,
       });
       break;
+    }
 
     case 'instagram':
       publishResult = await publishToInstagram({
@@ -223,9 +244,26 @@ async function updatePostStatus(postId: string, status: string, errorMessage?: s
   });
 }
 
+function buildFacebookActionButton(
+  post: PostRow,
+  whatsappPhone?: string,
+): FacebookActionButtonConfig | undefined {
+  if (!post.action_button_enabled || post.platform !== 'facebook') return undefined;
+  return {
+    enabled: true,
+    type: post.action_button_type === 'whatsapp' ? 'whatsapp' : 'website',
+    text: post.action_button_text || 'Comprar',
+    url: post.action_button_url,
+    whatsappMessage: post.action_button_whatsapp_message,
+    whatsappPhone,
+  };
+}
+
 function buildCaption(post: PostRow): string {
   const parts = [post.caption || post.title];
   if (post.cta) parts.push(post.cta);
+  const actionButton = buildFacebookActionButton(post);
+  if (actionButton) parts.push(buildActionCaptionLine(actionButton));
   if (post.hashtags?.length) parts.push(post.hashtags.map((h) => (h.startsWith('#') ? h : `#${h}`)).join(' '));
   return appendPollonContact(parts.filter(Boolean).join('\n\n'));
 }
