@@ -424,7 +424,7 @@ export default function ScheduledStoriesPage() {
                         Añadir botón
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
-                        Botón &quot;Enlace web&quot; como en Facebook. Texto por defecto: Comprar.
+                        Botón &quot;Enlace web&quot; con código QR escaneable hacia tu página (la API de Facebook no permite enlace clickeable directo en historias automáticas).
                       </p>
                     </div>
                     <label className="flex items-center gap-2 text-sm shrink-0">
@@ -471,7 +471,7 @@ export default function ScheduledStoriesPage() {
                           />
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
-                          URL de tu página web. Se usa como referencia y se muestra el botón en la imagen al publicar.
+                          URL de tu página web. Se incluye código QR escaneable en la historia publicada.
                         </p>
                       </div>
                     </div>
@@ -489,10 +489,12 @@ export default function ScheduledStoriesPage() {
                           className="absolute inset-0 w-full h-full object-cover"
                         />
                         {form.link_button_enabled && (
-                          <div className="absolute inset-x-0 bottom-10 flex justify-center px-4 pointer-events-none">
+                          <div className="absolute inset-x-0 bottom-10 flex flex-col items-center gap-2 px-4 pointer-events-none">
                             <span className="bg-white text-[#050505] text-sm font-semibold px-6 py-2.5 rounded-full shadow-lg">
                               {form.link_button_text || 'Comprar'}
                             </span>
+                            <span className="w-10 h-10 bg-white rounded border-2 border-gray-300 flex items-center justify-center text-[8px] text-gray-500 font-bold">QR</span>
+                            <span className="text-white text-[10px] drop-shadow">Escanea para abrir enlace</span>
                           </div>
                         )}
                       </div>
@@ -567,7 +569,7 @@ export default function ScheduledStoriesPage() {
                       <Input type="time" value={form.publish_time}
                         onChange={(e) => setForm({ ...form, publish_time: e.target.value })} />
                       <p className="text-xs text-gray-500 mt-1">
-                        Se repite en los días seleccionados. Publicación automática cada minuto (máx. ~1 min de retraso).
+                        Se repite en los días seleccionados. Publicación automática cada minuto; si se pierde la hora exacta, publica en cuanto detecta que ya pasó (mismo día).
                       </p>
                     </div>
                   </>

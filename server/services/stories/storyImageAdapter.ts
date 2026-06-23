@@ -39,7 +39,7 @@ export async function prepareStoryImagePublicUrl(
   let adapted = await adaptImageToStoryFormat(buffer);
 
   if (linkButton?.enabled && linkButton.text) {
-    adapted = await applyStoryLinkButtonOverlay(adapted, linkButton.text);
+    adapted = await applyStoryLinkButtonOverlay(adapted, linkButton.text, linkButton.url);
   }
 
   const supabase = getSupabaseAdmin();

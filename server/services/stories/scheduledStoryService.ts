@@ -7,7 +7,7 @@ import {
   alreadyPublishedToday,
   getSantiagoNow,
   isDayScheduled,
-  isTimeInPublishWindow,
+  isPublishTimeReached,
 } from '../../utils/santiagoTime.js';
 
 export interface ScheduledStoryRow {
@@ -100,10 +100,15 @@ export async function publishSingleStory(
       url: normalizeStoryLinkUrl(story.link_button_url),
     });
 
+    const linkEnabled = story.link_button_enabled !== false;
+    const linkUrl = linkEnabled ? normalizeStoryLinkUrl(story.link_button_url) : undefined;
+
     const result = await publishStoryWithRetry({
       pageId: account.account_id,
       accessToken: account.access_token,
       imageUrl: storyImageUrl,
+      linkUrl,
+      linkText: story.link_button_text || 'Comprar',
     });
 
     const now = new Date().toISOString();
@@ -188,7 +193,7 @@ export function isStoryDue(story: ScheduledStoryRow, force = false): boolean {
 
   const now = getSantiagoNow();
   if (!story.days_of_week?.length || !isDayScheduled(story.days_of_week, now.dayOfWeek)) return false;
-  if (!force && !isTimeInPublishWindow(now, story.publish_time, 2)) return false;
+  if (!force && !isPublishTimeReached(now, story.publish_time)) return false;
   if (!force && alreadyPublishedToday(story.last_published_at, now)) return false;
   return true;
 }

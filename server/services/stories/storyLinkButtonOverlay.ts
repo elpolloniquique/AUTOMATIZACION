@@ -1,3 +1,4 @@
+import QRCode from 'qrcode';
 import sharp from 'sharp';
 import { fitTextToWidth, measureTextWidth, textToSvgPath } from '../gallery/frameTextRenderer.js';
 
@@ -42,29 +43,40 @@ async function rasterizeSvg(body: string, width: number, height: number): Promis
   return sharp(Buffer.from(body)).png().toBuffer();
 }
 
-/** Superpone botón píldora blanco estilo Facebook Stories (parte inferior central) */
+/** Superpone botón píldora + QR escaneable (la API de Meta no permite enlace clickeable nativo) */
 export async function applyStoryLinkButtonOverlay(
   imageBuffer: Buffer,
   buttonText: string,
+  linkUrl: string,
 ): Promise<Buffer> {
   const label = (buttonText || 'Comprar').trim().slice(0, 30) || 'Comprar';
+  const url = normalizeStoryLinkUrl(linkUrl);
   const fontFamily = 'Roboto-Bold' as const;
   const fontSize = 42;
   const pillH = 88;
   const minPillW = 280;
   const maxPillW = 720;
   const horizontalPad = 56;
+  const qrSize = 128;
 
   const fit = await fitTextToWidth(label, maxPillW - horizontalPad, fontSize, fontFamily);
   const textWidth = await measureTextWidth(fit.text, fit.fontSize, fontFamily);
   const pillW = Math.min(maxPillW, Math.max(minPillW, Math.round(textWidth + horizontalPad)));
   const pillX = Math.round((STORY_W - pillW) / 2);
-  const pillY = STORY_H - 200;
+  const pillY = STORY_H - 280;
 
   const textPath = await textToSvgPath(fit.text, {
     x: STORY_W / 2,
     y: pillY + Math.round(pillH * 0.68),
     fontSize: fit.fontSize,
+    anchor: 'middle',
+    fontFamily,
+  });
+
+  const hintPath = await textToSvgPath('Escanea para abrir enlace', {
+    x: STORY_W / 2,
+    y: pillY + pillH + qrSize + 36,
+    fontSize: 22,
     anchor: 'middle',
     fontFamily,
   });
@@ -78,12 +90,26 @@ export async function applyStoryLinkButtonOverlay(
     <rect x="${pillX}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillH / 2}"
       fill="#FFFFFF" filter="url(#btnShadow)"/>
     <path d="${textPath}" fill="#050505"/>
+    <path d="${hintPath}" fill="#FFFFFF"/>
   </svg>`;
+
+  const qrBuffer = await QRCode.toBuffer(url, {
+    type: 'png',
+    width: qrSize,
+    margin: 1,
+    color: { dark: '#000000', light: '#FFFFFF' },
+  });
+
+  const qrLeft = Math.round((STORY_W - qrSize) / 2);
+  const qrTop = pillY + pillH + 16;
 
   const overlay = await rasterizeSvg(overlaySvg, STORY_W, STORY_H);
 
   return sharp(imageBuffer)
-    .composite([{ input: overlay, top: 0, left: 0 }])
+    .composite([
+      { input: overlay, top: 0, left: 0 },
+      { input: qrBuffer, top: qrTop, left: qrLeft },
+    ])
     .jpeg({ quality: 92 })
     .toBuffer();
 }

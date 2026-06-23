@@ -63,6 +63,13 @@ export function parseTimeToMinutes(time: string): number {
   return (h || 0) * 60 + (m || 0);
 }
 
+/** ¿Ya pasó la hora programada hoy (Chile)? */
+export function isPublishTimeReached(now: SantiagoParts, publishTime: string): boolean {
+  const nowMin = now.hour * 60 + now.minute;
+  const targetMin = parseTimeToMinutes(publishTime);
+  return nowMin >= targetMin;
+}
+
 /** ¿Hora actual dentro de la ventana de publicación? (tolerancia en minutos) */
 export function isTimeInPublishWindow(
   now: SantiagoParts,
