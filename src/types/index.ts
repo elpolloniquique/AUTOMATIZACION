@@ -105,12 +105,19 @@ export interface SocialAccount {
   created_at: string;
 }
 
+export type StoryAudioMode = 'original' | 'muted' | 'music';
+export type StoryMediaType = 'image' | 'video';
+
 export interface ScheduledStory {
   id: string;
   branch_id: string;
   created_by: string | null;
   title: string;
-  image_url: string;
+  media_type?: StoryMediaType;
+  image_url: string | null;
+  video_url?: string | null;
+  audio_mode?: StoryAudioMode;
+  music_url?: string | null;
   gallery_item_id: string | null;
   schedule_mode?: 'recurring' | 'once';
   scheduled_at?: string | null;
@@ -132,7 +139,9 @@ export interface StoryPublication {
   scheduled_story_id: string | null;
   branch_id: string;
   title: string | null;
-  image_url: string;
+  media_type?: 'image' | 'video';
+  image_url: string | null;
+  video_url?: string | null;
   status: 'success' | 'failed' | 'pending';
   external_story_id: string | null;
   story_url: string | null;

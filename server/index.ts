@@ -707,7 +707,11 @@ app.get('/api/dashboard/stats', authMiddleware, asyncHandler(async (req, res) =>
 const scheduledStoryBaseSchema = z.object({
   branch_id: z.string().uuid(),
   title: z.string().min(2),
-  image_url: z.string().url(),
+  media_type: z.enum(['image', 'video']).optional(),
+  image_url: z.string().url().optional().nullable(),
+  video_url: z.string().url().optional().nullable(),
+  audio_mode: z.enum(['original', 'muted', 'music']).optional(),
+  music_url: z.string().url().optional().nullable(),
   gallery_item_id: z.string().uuid().optional().nullable(),
   schedule_mode: z.enum(['recurring', 'once']).optional(),
   scheduled_at: z.string().datetime().optional().nullable(),
@@ -720,7 +724,25 @@ const scheduledStoryBaseSchema = z.object({
   link_button_url: z.string().url().optional().nullable(),
 });
 
+function validateStoryMedia(data: z.infer<typeof scheduledStoryBaseSchema>, ctx: z.RefinementCtx) {
+  const mediaType = data.media_type || 'image';
+  if (mediaType === 'image') {
+    if (!data.image_url) {
+      ctx.addIssue({ code: 'custom', message: 'Selecciona una imagen', path: ['image_url'] });
+    }
+  } else {
+    if (!data.video_url) {
+      ctx.addIssue({ code: 'custom', message: 'Sube un video', path: ['video_url'] });
+    }
+    const audioMode = data.audio_mode || 'original';
+    if (audioMode === 'music' && !data.music_url) {
+      ctx.addIssue({ code: 'custom', message: 'Sube un archivo de música', path: ['music_url'] });
+    }
+  }
+}
+
 function validateStorySchedule(data: z.infer<typeof scheduledStoryBaseSchema>, ctx: z.RefinementCtx) {
+  validateStoryMedia(data, ctx);
   const mode = data.schedule_mode || 'recurring';
   if (mode === 'once') {
     if (!data.scheduled_at) {
@@ -774,14 +796,29 @@ app.post('/api/scheduled-stories', authMiddleware, roleGuard('super_admin', 'adm
 app.put('/api/scheduled-stories/:id', authMiddleware, roleGuard('super_admin', 'admin_sucursal'), asyncHandler(async (req, res) => {
   const parsed = scheduledStoryBaseSchema.partial().extend({
     title: z.string().min(2).optional(),
-    image_url: z.string().url().optional(),
+    image_url: z.string().url().optional().nullable(),
+    video_url: z.string().url().optional().nullable(),
+    music_url: z.string().url().optional().nullable(),
     branch_id: z.string().uuid().optional(),
   }).superRefine((data, ctx) => {
+    if (data.media_type || data.image_url !== undefined || data.video_url !== undefined || data.audio_mode) {
+      validateStoryMedia({
+        branch_id: data.branch_id || '00000000-0000-0000-0000-000000000001',
+        title: data.title || 'x',
+        image_url: data.image_url,
+        video_url: data.video_url,
+        media_type: data.media_type,
+        audio_mode: data.audio_mode,
+        music_url: data.music_url,
+      }, ctx);
+    }
     if (data.schedule_mode || data.scheduled_at !== undefined || data.days_of_week !== undefined) {
       validateStorySchedule({
         branch_id: data.branch_id || '00000000-0000-0000-0000-000000000001',
         title: data.title || 'x',
         image_url: data.image_url || 'https://example.com/x.png',
+        video_url: data.video_url,
+        media_type: data.media_type,
         ...data,
       }, ctx);
     }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Clock, History, Plus, Save, Send, Trash2, BookImage, Link2 } from 'lucide-react';
+import { Clock, History, Plus, Save, Send, Trash2, BookImage, Link2, Film, ImageIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { apiFetch, formatDate, fromDatetimeLocalValue, toDatetimeLocalValue } from '@/lib/utils';
@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { GallerySelectionBar } from '@/components/GallerySelectionBar';
-import type { Branch, MediaGalleryItem, ScheduledStory, StoryPublication } from '@/types';
+import { StoryVideoUploader } from '@/components/StoryVideoUploader';
+import type { Branch, MediaGalleryItem, ScheduledStory, StoryAudioMode, StoryMediaType, StoryPublication } from '@/types';
 import {
   DEFAULT_STORY_LINK_URL,
   normalizeStoryLinkUrl,
@@ -34,7 +35,11 @@ interface GalleryPickState {
 const emptyForm = (branchId: string, branchWebsite?: string | null) => ({
   title: '',
   branch_id: branchId,
+  media_type: 'image' as StoryMediaType,
   image_url: '',
+  video_url: '',
+  audio_mode: 'original' as StoryAudioMode,
+  music_url: '',
   gallery_item_id: null as string | null,
   schedule_mode: 'recurring' as 'recurring' | 'once',
   scheduled_at: '',
@@ -57,6 +62,7 @@ export default function ScheduledStoriesPage() {
   const [editing, setEditing] = useState<ScheduledStory | null>(null);
   const [form, setForm] = useState(emptyForm(''));
   const [selectedGallery, setSelectedGallery] = useState<MediaGalleryItem[]>([]);
+  const [musicFileName, setMusicFileName] = useState('');
   const [saving, setSaving] = useState(false);
   const [publishingId, setPublishingId] = useState<string | null>(null);
 
@@ -64,7 +70,9 @@ export default function ScheduledStoriesPage() {
   const returnPath = '/stories';
   const branchesLoaded = useRef(false);
   const selectedBranch = branches.find((b) => b.id === branchId);
-  const previewImageUrl = selectedGallery[0]?.public_url || form.image_url;
+  const isVideo = form.media_type === 'video';
+  const previewImageUrl = !isVideo ? (selectedGallery[0]?.public_url || form.image_url) : '';
+  const previewVideoUrl = isVideo ? form.video_url : '';
 
   function applyGalleryItem(item: MediaGalleryItem) {
     setSelectedGallery([item]);
@@ -144,15 +152,21 @@ export default function ScheduledStoriesPage() {
     setEditing(null);
     setForm(emptyForm(branchId, selectedBranch?.website));
     setSelectedGallery([]);
+    setMusicFileName('');
   }
 
   function startEdit(story: ScheduledStory) {
     setEditing(story);
     const mode = story.schedule_mode || 'recurring';
+    const mediaType = story.media_type || 'image';
     setForm({
       title: story.title,
       branch_id: story.branch_id,
-      image_url: story.image_url,
+      media_type: mediaType,
+      image_url: story.image_url || '',
+      video_url: story.video_url || '',
+      audio_mode: story.audio_mode || 'original',
+      music_url: story.music_url || '',
       gallery_item_id: story.gallery_item_id,
       schedule_mode: mode,
       scheduled_at: mode === 'once' ? toDatetimeLocalValue(story.scheduled_at) : '',
@@ -163,12 +177,15 @@ export default function ScheduledStoriesPage() {
       link_button_text: story.link_button_text || 'Comprar',
       link_button_url: story.link_button_url || DEFAULT_STORY_LINK_URL,
     });
-    if (story.image_url) {
+    setMusicFileName(story.music_url ? 'Pista guardada' : '');
+    if (mediaType === 'image' && story.image_url) {
       setSelectedGallery([{
         id: story.gallery_item_id || story.id,
         title: story.title,
         public_url: story.image_url,
       } as MediaGalleryItem]);
+    } else {
+      setSelectedGallery([]);
     }
   }
 
@@ -187,7 +204,14 @@ export default function ScheduledStoriesPage() {
     const galleryItemId = selectedGallery[0]?.id || form.gallery_item_id || null;
 
     if (!form.title.trim()) return alert('Nombre requerido');
-    if (!imageUrl) return alert('Selecciona una imagen de la galería');
+    if (form.media_type === 'image') {
+      if (!imageUrl) return alert('Selecciona una imagen de la galería');
+    } else {
+      if (!form.video_url) return alert('Sube un video para la historia');
+      if (form.audio_mode === 'music' && !form.music_url) {
+        return alert('Sube una pista de música o elige otro modo de audio');
+      }
+    }
     if (form.schedule_mode === 'recurring' && form.days_of_week.length === 0) {
       return alert('Selecciona al menos un día');
     }
@@ -211,8 +235,13 @@ export default function ScheduledStoriesPage() {
       const payload = {
         ...form,
         branch_id: branchId,
-        image_url: imageUrl,
-        gallery_item_id: galleryItemId,
+        media_type: form.media_type,
+        image_url: form.media_type === 'image' ? imageUrl : null,
+        video_url: form.media_type === 'video' ? form.video_url : null,
+        audio_mode: form.media_type === 'video' ? form.audio_mode : 'original',
+        music_url: form.media_type === 'video' && form.audio_mode === 'music' ? form.music_url : null,
+        gallery_item_id: form.media_type === 'image' ? galleryItemId : null,
+        link_button_enabled: form.media_type === 'image' ? form.link_button_enabled : false,
         link_button_url: form.link_button_enabled
           ? normalizeStoryLinkUrl(form.link_button_url)
           : null,
@@ -294,7 +323,7 @@ export default function ScheduledStoriesPage() {
             Historias programadas — Facebook
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Publica automáticamente en la Historia de tu Página de Facebook. Para varias historias al día, crea una plantilla por cada hora.
+            Publica automáticamente imágenes o videos en la Historia de tu Página de Facebook. Los videos pueden llevar música, audio original o ir silenciados.
           </p>
         </div>
         <div className="flex gap-2 items-end">
@@ -353,14 +382,37 @@ export default function ScheduledStoriesPage() {
       {tab === 'schedule' && (
         <div className="grid lg:grid-cols-2 gap-6">
           <div className="space-y-4">
-            {stories.map((s) => (
+            {stories.map((s) => {
+              const isStoryVideo = (s.media_type || 'image') === 'video';
+              const thumbUrl = s.image_url || s.video_url || '';
+              return (
               <Card key={s.id} className={editing?.id === s.id ? 'ring-2 ring-pollon-red' : ''}>
                 <CardContent className="p-4 flex gap-4">
-                  <img src={s.image_url} alt={s.title} className="w-16 h-28 object-cover rounded-lg border" />
+                  <div className="relative w-16 h-28 shrink-0">
+                    {isStoryVideo && s.video_url ? (
+                      <video src={s.video_url} className="w-full h-full object-cover rounded-lg border" muted />
+                    ) : thumbUrl ? (
+                      <img src={thumbUrl} alt={s.title} className="w-full h-full object-cover rounded-lg border" />
+                    ) : (
+                      <div className="w-full h-full rounded-lg border bg-gray-100 flex items-center justify-center">
+                        <Film className="w-6 h-6 text-gray-400" />
+                      </div>
+                    )}
+                    <span className={`absolute top-1 left-1 text-[9px] px-1.5 py-0.5 rounded font-semibold ${
+                      isStoryVideo ? 'bg-purple-600 text-white' : 'bg-blue-600 text-white'
+                    }`}>
+                      {isStoryVideo ? 'VIDEO' : 'FOTO'}
+                    </span>
+                  </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold truncate">{s.title}</h3>
                     <p className="text-xs text-gray-500 mt-1">{formatSchedule(s)}</p>
-                    {s.link_button_enabled !== false && (
+                    {isStoryVideo && s.audio_mode && (
+                      <p className="text-xs text-purple-700 mt-1">
+                        Audio: {s.audio_mode === 'music' ? 'Con música' : s.audio_mode === 'muted' ? 'Sin música' : 'Original'}
+                      </p>
+                    )}
+                    {s.link_button_enabled !== false && !isStoryVideo && (
                       <p className="text-xs text-blue-700 mt-1 flex items-center gap-1 truncate">
                         <Link2 className="w-3 h-3 shrink-0" />
                         {s.link_button_text || 'Comprar'} · {s.link_button_url || DEFAULT_STORY_LINK_URL}
@@ -388,7 +440,8 @@ export default function ScheduledStoriesPage() {
                   )}
                 </CardContent>
               </Card>
-            ))}
+            );
+            })}
             {stories.length === 0 && (
               <Card><CardContent className="p-8 text-center text-gray-500">No hay historias programadas.</CardContent></Card>
             )}
@@ -406,16 +459,84 @@ export default function ScheduledStoriesPage() {
                     placeholder="Ej: Promo lunes mañana" />
                 </div>
 
-                <GallerySelectionBar
-                  selected={selectedGallery}
-                  maxPhotos={1}
-                  onRemove={() => {
-                    setSelectedGallery([]);
-                    setForm((f) => ({ ...f, image_url: '', gallery_item_id: null }));
-                  }}
-                  returnPath={returnPath}
-                />
+                <div>
+                  <Label className="mb-2 block">Tipo de contenido</Label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({
+                        ...f,
+                        media_type: 'image',
+                        video_url: '',
+                        audio_mode: 'original',
+                        music_url: '',
+                      }))}
+                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium border ${
+                        form.media_type === 'image'
+                          ? 'bg-pollon-red text-white border-pollon-red'
+                          : 'bg-white text-gray-600 border-gray-300'
+                      }`}
+                    >
+                      <ImageIcon className="w-4 h-4" /> Imagen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedGallery([]);
+                        setForm((f) => ({
+                          ...f,
+                          media_type: 'video',
+                          image_url: '',
+                          gallery_item_id: null,
+                          link_button_enabled: false,
+                        }));
+                      }}
+                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium border ${
+                        form.media_type === 'video'
+                          ? 'bg-pollon-red text-white border-pollon-red'
+                          : 'bg-white text-gray-600 border-gray-300'
+                      }`}
+                    >
+                      <Film className="w-4 h-4" /> Video
+                    </button>
+                  </div>
+                </div>
 
+                {form.media_type === 'image' ? (
+                  <GallerySelectionBar
+                    selected={selectedGallery}
+                    maxPhotos={1}
+                    onRemove={() => {
+                      setSelectedGallery([]);
+                      setForm((f) => ({ ...f, image_url: '', gallery_item_id: null }));
+                    }}
+                    returnPath={returnPath}
+                  />
+                ) : (
+                  <StoryVideoUploader
+                    branchId={branchId}
+                    videoUrl={form.video_url}
+                    audioMode={form.audio_mode}
+                    musicUrl={form.music_url}
+                    musicFileName={musicFileName}
+                    onVideoChange={(url) => setForm((f) => ({ ...f, video_url: url }))}
+                    onAudioModeChange={(mode) => setForm((f) => ({
+                      ...f,
+                      audio_mode: mode,
+                      music_url: mode === 'music' ? f.music_url : '',
+                    }))}
+                    onMusicChange={(url, name) => {
+                      setForm((f) => ({ ...f, music_url: url }));
+                      setMusicFileName(name);
+                    }}
+                    onClear={() => {
+                      setForm((f) => ({ ...f, video_url: '', music_url: '' }));
+                      setMusicFileName('');
+                    }}
+                  />
+                )}
+
+                {form.media_type === 'image' && (
                 <div className="rounded-xl border bg-gray-50/80 p-4 space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -477,24 +598,41 @@ export default function ScheduledStoriesPage() {
                     </div>
                   )}
                 </div>
+                )}
 
-                {previewImageUrl && (
+                {(previewImageUrl || previewVideoUrl) && (
                   <div>
                     <Label className="mb-2 block">Vista previa</Label>
                     <div className="mx-auto w-full max-w-[220px]">
                       <div className="relative aspect-[9/16] rounded-2xl overflow-hidden border shadow-md bg-black">
-                        <img
-                          src={previewImageUrl}
-                          alt="Vista previa historia"
-                          className="absolute inset-0 w-full h-full object-cover"
-                        />
-                        {form.link_button_enabled && (
+                        {previewVideoUrl ? (
+                          <video
+                            src={previewVideoUrl}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            muted={form.audio_mode === 'muted'}
+                            autoPlay
+                            loop
+                            playsInline
+                          />
+                        ) : (
+                          <img
+                            src={previewImageUrl}
+                            alt="Vista previa historia"
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                        )}
+                        {form.media_type === 'image' && form.link_button_enabled && (
                           <div className="absolute inset-x-0 bottom-10 flex flex-col items-center gap-2 px-4 pointer-events-none">
                             <span className="bg-white text-[#050505] text-sm font-semibold px-6 py-2.5 rounded-full shadow-lg">
                               {form.link_button_text || 'Comprar'}
                             </span>
                             <span className="w-10 h-10 bg-white rounded border-2 border-gray-300 flex items-center justify-center text-[8px] text-gray-500 font-bold">QR</span>
                             <span className="text-white text-[10px] drop-shadow">Escanea para abrir enlace</span>
+                          </div>
+                        )}
+                        {form.media_type === 'video' && form.audio_mode === 'music' && form.music_url && (
+                          <div className="absolute top-3 right-3 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full flex items-center gap-1">
+                            <Film className="w-3 h-3" /> Con música
                           </div>
                         )}
                       </div>
@@ -597,10 +735,24 @@ export default function ScheduledStoriesPage() {
 
       {tab === 'history' && (
         <div className="space-y-3">
-          {publications.map((p) => (
+          {publications.map((p) => {
+            const isPubVideo = (p.media_type || 'image') === 'video';
+            const thumb = p.image_url || p.video_url || '';
+            return (
             <Card key={p.id}>
               <CardContent className="p-4 flex gap-4 items-center">
-                <img src={p.image_url} alt="" className="w-12 h-20 object-cover rounded border" />
+                <div className="relative w-12 h-20 shrink-0">
+                  {isPubVideo && p.video_url && !p.image_url ? (
+                    <video src={p.video_url} className="w-full h-full object-cover rounded border" muted />
+                  ) : thumb ? (
+                    <img src={thumb} alt="" className="w-full h-full object-cover rounded border" />
+                  ) : (
+                    <div className="w-full h-full rounded border bg-gray-100" />
+                  )}
+                  {isPubVideo && (
+                    <span className="absolute bottom-0.5 left-0.5 text-[8px] bg-purple-600 text-white px-1 rounded">VIDEO</span>
+                  )}
+                </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{p.title || p.scheduled_stories?.title || 'Historia'}</p>
                   <p className="text-xs text-gray-500">
@@ -620,7 +772,8 @@ export default function ScheduledStoriesPage() {
                 )}
               </CardContent>
             </Card>
-          ))}
+          );
+          })}
           {publications.length === 0 && (
             <Card><CardContent className="p-8 text-center text-gray-500">Aún no hay historias publicadas.</CardContent></Card>
           )}

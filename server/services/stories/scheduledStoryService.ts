@@ -2,6 +2,8 @@ import { randomUUID } from 'crypto';
 import { getSupabaseAdmin } from '../../utils/supabase.js';
 import { publishStoryWithRetry } from '../meta/facebookStoryPublisher.js';
 import { prepareStoryImagePublicUrl } from './storyImageAdapter.js';
+import { prepareStoryVideoPublicUrl } from './storyVideoAdapter.js';
+import type { StoryAudioMode } from './storyVideoProcessor.js';
 import { normalizeStoryLinkUrl } from './storyLinkButtonOverlay.js';
 import {
   alreadyPublishedToday,
@@ -15,7 +17,11 @@ export interface ScheduledStoryRow {
   branch_id: string;
   created_by: string | null;
   title: string;
-  image_url: string;
+  media_type?: 'image' | 'video';
+  image_url: string | null;
+  video_url?: string | null;
+  audio_mode?: StoryAudioMode;
+  music_url?: string | null;
   gallery_item_id: string | null;
   schedule_mode: 'recurring' | 'once';
   scheduled_at: string | null;
@@ -37,7 +43,9 @@ export interface StoryPublicationRow {
   scheduled_story_id: string | null;
   branch_id: string;
   title: string | null;
-  image_url: string;
+  media_type?: 'image' | 'video';
+  image_url: string | null;
+  video_url?: string | null;
   status: 'success' | 'failed' | 'pending';
   external_story_id: string | null;
   story_url: string | null;
@@ -83,30 +91,52 @@ export async function publishSingleStory(
     return { success: false, error: err };
   }
 
+  const mediaType = story.media_type || 'image';
   const pubId = randomUUID();
   await supabase.from('story_publications').insert({
     id: pubId,
     scheduled_story_id: story.id,
     branch_id: story.branch_id,
     title: story.title,
+    media_type: mediaType,
     image_url: story.image_url,
+    video_url: story.video_url || null,
     status: 'pending',
   });
 
   try {
-    const storyImageUrl = await prepareStoryImagePublicUrl(story.image_url, story.id, {
-      enabled: story.link_button_enabled !== false,
-      text: story.link_button_text || 'Comprar',
-      url: normalizeStoryLinkUrl(story.link_button_url),
-    });
-
-    const linkEnabled = story.link_button_enabled !== false;
+    const linkEnabled = mediaType === 'image' && story.link_button_enabled !== false;
     const linkUrl = linkEnabled ? normalizeStoryLinkUrl(story.link_button_url) : undefined;
+
+    let publishImageUrl: string | undefined;
+    let publishVideoUrl: string | undefined;
+    let thumbnailUrl: string | null = story.image_url;
+
+    if (mediaType === 'video') {
+      if (!story.video_url) throw new Error('Historia de video sin URL de video');
+      const audioMode = story.audio_mode || 'original';
+      const prepared = await prepareStoryVideoPublicUrl(story.video_url, story.id, {
+        audioMode,
+        musicUrl: audioMode === 'music' ? story.music_url : null,
+      });
+      publishVideoUrl = prepared.videoUrl;
+      thumbnailUrl = prepared.thumbnailUrl;
+    } else {
+      if (!story.image_url) throw new Error('Historia de imagen sin URL de imagen');
+      publishImageUrl = await prepareStoryImagePublicUrl(story.image_url, story.id, {
+        enabled: story.link_button_enabled !== false,
+        text: story.link_button_text || 'Comprar',
+        url: normalizeStoryLinkUrl(story.link_button_url),
+      });
+      thumbnailUrl = publishImageUrl;
+    }
 
     const result = await publishStoryWithRetry({
       pageId: account.account_id,
       accessToken: account.access_token,
-      imageUrl: storyImageUrl,
+      mediaType,
+      imageUrl: publishImageUrl,
+      videoUrl: publishVideoUrl,
       linkUrl,
       linkText: story.link_button_text || 'Comprar',
     });
@@ -119,7 +149,9 @@ export async function publishSingleStory(
         external_story_id: result.externalStoryId || null,
         story_url: result.storyUrl || null,
         published_at: now,
-        image_url: storyImageUrl,
+        media_type: mediaType,
+        image_url: thumbnailUrl,
+        video_url: publishVideoUrl || null,
       }).eq('id', pubId);
 
       await supabase.from('scheduled_stories').update({
@@ -146,7 +178,7 @@ export async function publishSingleStory(
 
     return { success: false, error: err };
   } catch (err) {
-    const errMsg = err instanceof Error ? err.message : 'Error al preparar imagen';
+    const errMsg = err instanceof Error ? err.message : 'Error al preparar medio';
     await supabase.from('story_publications').update({
       status: 'failed',
       error_message: errMsg,
@@ -172,7 +204,9 @@ async function recordPublication(
     scheduled_story_id: story.id,
     branch_id: story.branch_id,
     title: story.title,
+    media_type: story.media_type || 'image',
     image_url: story.image_url,
+    video_url: story.video_url || null,
     status,
     error_message: error,
     published_at: new Date().toISOString(),
@@ -248,11 +282,22 @@ export function buildStoryPayload(body: Record<string, unknown>, userId?: string
   const linkEnabled = body.link_button_enabled !== false;
   const linkText = String(body.link_button_text || 'Comprar').trim().slice(0, 30) || 'Comprar';
 
+  const mediaType = (body.media_type as string) === 'video' ? 'video' : 'image';
+  const audioMode = ['original', 'muted', 'music'].includes(String(body.audio_mode))
+    ? (body.audio_mode as StoryAudioMode)
+    : 'original';
+
   return {
     branch_id: body.branch_id,
     created_by: userId || body.created_by || null,
     title: body.title,
-    image_url: body.image_url,
+    media_type: mediaType,
+    image_url: mediaType === 'image' ? (body.image_url as string) : (body.image_url as string | null) || null,
+    video_url: mediaType === 'video' ? (body.video_url as string) : null,
+    audio_mode: mediaType === 'video' ? audioMode : 'original',
+    music_url: mediaType === 'video' && audioMode === 'music'
+      ? (body.music_url as string) || null
+      : null,
     gallery_item_id: body.gallery_item_id || null,
     schedule_mode: mode,
     scheduled_at: mode === 'once' ? (body.scheduled_at as string) || null : null,

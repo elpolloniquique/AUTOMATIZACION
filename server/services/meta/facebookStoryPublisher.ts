@@ -4,10 +4,14 @@ import { mapButtonTextToCtaType } from './facebookPostActionButton.js';
 
 const GRAPH_BASE = `https://graph.facebook.com/${config.meta.graphVersion}`;
 
+export type StoryMediaType = 'image' | 'video';
+
 export interface FacebookStoryPublishParams {
   pageId: string;
   accessToken: string;
-  imageUrl: string;
+  mediaType?: StoryMediaType;
+  imageUrl?: string;
+  videoUrl?: string;
   linkUrl?: string;
   linkText?: string;
 }
@@ -17,6 +21,7 @@ export interface StoryPublishResult {
   externalStoryId?: string;
   storyUrl?: string;
   photoId?: string;
+  videoId?: string;
   error?: string;
   linkMode?: 'native' | 'photo';
 }
@@ -73,6 +78,10 @@ export async function publishPhotoStoryToFacebook(
 ): Promise<StoryPublishResult> {
   const { pageId, accessToken, imageUrl, linkUrl, linkText } = params;
 
+  if (!imageUrl) {
+    return { success: false, error: 'URL de imagen requerida' };
+  }
+
   try {
     const uploadRes = await axios.post(
       `${GRAPH_BASE}/${pageId}/photos`,
@@ -115,6 +124,81 @@ export async function publishPhotoStoryToFacebook(
   }
 }
 
+async function uploadVideoForStory(
+  pageId: string,
+  accessToken: string,
+  videoUrl: string,
+): Promise<string> {
+  const initRes = await axios.post(
+    `${GRAPH_BASE}/${pageId}/video_stories`,
+    { upload_phase: 'start' },
+    {
+      params: { access_token: accessToken },
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 60000,
+    },
+  );
+
+  const videoId = initRes.data?.video_id;
+  const uploadUrl = initRes.data?.upload_url;
+
+  if (!videoId || !uploadUrl) {
+    throw new Error('Meta no devolvió video_id o upload_url al iniciar la subida');
+  }
+
+  const uploadRes = await axios.post(uploadUrl, null, {
+    headers: {
+      Authorization: `OAuth ${accessToken}`,
+      file_url: videoUrl,
+    },
+    timeout: 180000,
+  });
+
+  if (uploadRes.data?.success !== true) {
+    throw new Error('Meta rechazó la subida del archivo de video');
+  }
+
+  const finishRes = await axios.post(
+    `${GRAPH_BASE}/${pageId}/video_stories`,
+    { upload_phase: 'finish', video_id: videoId },
+    {
+      params: { access_token: accessToken },
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 60000,
+    },
+  );
+
+  const postId = finishRes.data?.post_id;
+  const success = finishRes.data?.success === true || Boolean(postId);
+  if (!success) {
+    throw new Error('Meta rechazó la publicación del video story');
+  }
+
+  return postId || videoId;
+}
+
+export async function publishVideoStoryToFacebook(
+  params: FacebookStoryPublishParams,
+): Promise<StoryPublishResult> {
+  const { pageId, accessToken, videoUrl } = params;
+
+  if (!videoUrl) {
+    return { success: false, error: 'URL de video requerida' };
+  }
+
+  try {
+    const postId = await uploadVideoForStory(pageId, accessToken, videoUrl);
+    return {
+      success: true,
+      externalStoryId: postId,
+      storyUrl: postId ? `https://www.facebook.com/stories/${postId}` : undefined,
+      videoId: postId,
+    };
+  } catch (err: unknown) {
+    return { success: false, error: extractAxiosError(err) };
+  }
+}
+
 function extractAxiosError(err: unknown): string {
   if (axios.isAxiosError(err)) {
     const apiError = err.response?.data?.error;
@@ -131,11 +215,16 @@ export async function publishStoryWithRetry(
   params: FacebookStoryPublishParams,
   maxRetries = 1,
 ): Promise<StoryPublishResult> {
+  const mediaType = params.mediaType || (params.videoUrl ? 'video' : 'image');
+  const publishFn = mediaType === 'video'
+    ? publishVideoStoryToFacebook
+    : publishPhotoStoryToFacebook;
+
   let last: StoryPublishResult = { success: false, error: 'Sin intentos' };
   for (let i = 0; i <= maxRetries; i++) {
-    last = await publishPhotoStoryToFacebook(params);
+    last = await publishFn(params);
     if (last.success) return last;
-    if (i < maxRetries) await new Promise((r) => setTimeout(r, 1000));
+    if (i < maxRetries) await new Promise((r) => setTimeout(r, 2000));
   }
   return last;
 }
